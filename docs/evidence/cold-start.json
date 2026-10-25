@@ -1,0 +1,13 @@
+{
+  "pass": true,
+  "powershell": "5.1.26100.9444",
+  "normalExitUsed": true,
+  "coldLaunchCompleted": true,
+  "patchEnabled": true,
+  "restoredDawnFmTrackIndex": 6,
+  "requestedPosition": 178.0468480725624,
+  "actualPosition": 178.2886848072563,
+  "playing": true,
+  "clientVersion": "3.1.42.205594",
+  "sampleRate": 44100
+}

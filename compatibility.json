@@ -1,0 +1,48 @@
+{
+  "status": "experimental-client-patch",
+  "productionPatchAvailable": false,
+  "target": "official-netease-windows-desktop-client",
+  "observed": {
+    "windowsBuild": "26200",
+    "windowsArchitecture": "x64",
+    "clientVersion": "3.1.42.205594",
+    "clientArchitecture": "x64",
+    "cefVersion": "91.0.4472.169",
+    "powershellRuntimeTested": [
+      "5.1.26100.9444",
+      "7.6.6"
+    ]
+  },
+  "verifiedCapabilities": [
+    "read-only-client-discovery",
+    "cef-loopback-debug-interface",
+    "official-playback-bridge-discovery",
+    "official-next-track-prefetch-metadata",
+    "offline-pcm-continuity-at-44100-48000-96000",
+    "generated-flac-and-lame-mp3-decoded-frame-counts",
+    "official-source-refresh-after-http-403",
+    "aac-edit-timing-normalization",
+    "natural-dawn-fm-to-gasoline",
+    "natural-how-do-i-make-you-love-me-to-take-my-breath",
+    "official-pause-resume-seek",
+    "disable-restores-native-progress",
+    "windows-powershell-5.1-existing-client-enable-and-status",
+    "windows-powershell-5.1-cold-launch-and-position-restore",
+    "idempotent-playback-rate-reapply-during-handoff",
+    "default-wasapi-loopback-seek-assisted-handoff",
+    "default-wasapi-loopback-natural-dawn-fm-to-gasoline"
+  ],
+  "unverified": [
+    "subjective-listening-acceptance",
+    "windows-10-runtime",
+    "x86-runtime",
+    "windows-arm64-runtime",
+    "other-client-versions",
+    "complex-queue-mutations",
+    "native-effects-spatial-audio",
+    "smtc-and-bluetooth"
+  ],
+  "version": "0.2.1-experimental",
+  "experimentalPatchAvailable": true,
+  "requiresLauncherAfterClientRestart": true
+}

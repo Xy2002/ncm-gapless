@@ -1,0 +1,8 @@
+{
+  "pass": true,
+  "filesUnchanged": {
+    "cloudmusic.exe": true,
+    "cloudmusic.dll": true,
+    "package/orpheus.ntpk": true
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "date": "2026-10-26",
+  "clientVersion": "3.1.42.205594",
+  "analysisRate": 8000,
+  "timingGridMs": 0.125,
+  "symptom": "brief output interruption near start of second track",
+  "cause": "same playback rate reapplied by official SDK stopped and restarted the active second source",
+  "beforeVersion": "0.2.0-experimental",
+  "afterVersion": "0.2.1-experimental",
+  "before": {
+    "pass": false,
+    "reliable": false,
+    "insertedTimeMs": 100.625,
+    "matches": [
+      {
+        "name": "tail",
+        "correlation": 0.99517,
+        "lagMs": 324.125
+      },
+      {
+        "name": "head-early",
+        "correlation": 0.64299,
+        "lagMs": 424.75
+      },
+      {
+        "name": "head-late",
+        "correlation": 0.97873,
+        "lagMs": 424.75
+      }
+    ],
+    "deviceRate": 48000,
+    "captureFlags": [],
+    "events": [
+      {
+        "name": "seek",
+        "value": 202.96945578231293,
+        "time": 10372.44081632653,
+        "wall": 10445023.900000006,
+        "state": "running",
+        "start": 10260.461632653061,
+        "end": 10465.686553287982,
+        "offset": 0.2445351473925257
+      },
+      {
+        "name": "play",
+        "time": 10372.44081632653,
+        "wall": 10445024,
+        "state": "running",
+        "start": 10260.461632653061,
+        "end": 10465.686553287982,
+        "offset": 0.2445351473925257
+      },
+      {
+        "name": "cancelNext",
+        "time": 10375.221405895692,
+        "wall": 10447794.600000024,
+        "state": "running",
+        "start": 10375.00081632653,
+        "end": 10638.642721088436,
+        "offset": 0
+      },
+      {
+        "name": "play",
+        "time": 10375.221405895692,
+        "wall": 10447801.400000006,
+        "state": "running",
+        "start": 10375.00081632653,
+        "end": 10638.642721088436,
+        "offset": 0
+      },
+      {
+        "name": "setRate",
+        "value": 1,
+        "time": 10375.24172335601,
+        "wall": 10447829.700000018,
+        "state": "running",
+        "start": 10375.00081632653,
+        "end": 10638.642721088436,
+        "offset": 0
+      },
+      {
+        "name": "seek",
+        "value": 0.2409070294797857,
+        "time": 10375.24172335601,
+        "wall": 10447829.700000018,
+        "state": "running",
+        "start": 10375.00081632653,
+        "end": 10638.642721088436,
+        "offset": 0
+      },
+      {
+        "name": "play",
+        "time": 10375.24172335601,
+        "wall": 10447829.700000018,
+        "state": "running",
+        "start": 10375.00081632653,
+        "end": 10638.642721088436,
+        "offset": 0
+      },
+      {
+        "name": "queue",
+        "time": 10376.321451247166,
+        "wall": 10448894,
+        "state": "running",
+        "start": 10375.342358276645,
+        "end": 10638.74335600907,
+        "offset": 0.2409070294797857
+      }
+    ],
+    "naturalPlaybackTest": false,
+    "audioSaved": false
+  },
+  "afterSeekAssisted": {
+    "pass": true,
+    "reliable": true,
+    "insertedTimeMs": 0.0,
+    "matches": [
+      {
+        "name": "tail",
+        "correlation": 0.99859,
+        "lagMs": 294.75
+      },
+      {
+        "name": "head-early",
+        "correlation": 0.99913,
+        "lagMs": 294.75
+      },
+      {
+        "name": "head-late",
+        "correlation": 0.99877,
+        "lagMs": 294.75
+      }
+    ],
+    "deviceRate": 48000,
+    "captureFlags": [],
+    "events": [
+      {
+        "name": "seek",
+        "value": 261.14190476190475,
+        "time": 9.78140589569161,
+        "wall": 10576622.900000006,
+        "state": "running",
+        "start": 0.5011791383219955,
+        "end": 145.44172335600783,
+        "offset": 118.70136054421891
+      },
+      {
+        "name": "play",
+        "time": 9.78140589569161,
+        "wall": 10576622.900000006,
+        "state": "running",
+        "start": 0.5011791383219955,
+        "end": 145.44172335600783,
+        "offset": 118.70136054421891
+      },
+      {
+        "name": "cancelNext",
+        "time": 12.521360544217687,
+        "wall": 10579348,
+        "state": "running",
+        "start": 12.34140589569161,
+        "end": 224.15557823129254,
+        "offset": 0
+      },
+      {
+        "name": "play",
+        "time": 12.521360544217687,
+        "wall": 10579350.400000006,
+        "state": "running",
+        "start": 12.34140589569161,
+        "end": 224.15557823129254,
+        "offset": 0
+      },
+      {
+        "name": "setRate",
+        "value": 1,
+        "time": 12.541678004535147,
+        "wall": 10579372.5,
+        "state": "running",
+        "start": 12.34140589569161,
+        "end": 224.15557823129254,
+        "offset": 0
+      },
+      {
+        "name": "queue",
+        "time": 13.482086167800453,
+        "wall": 10580315.700000018,
+        "state": "running",
+        "start": 12.34140589569161,
+        "end": 224.15557823129254,
+        "offset": 0
+      }
+    ],
+    "naturalPlaybackTest": false,
+    "audioSaved": false
+  },
+  "regressionBefore": {
+    "pass": false,
+    "failure": "same-rate-during-second-track altered rendered PCM: 0.434726282954216"
+  },
+  "scope": "One default WASAPI output device; synthetic regression plus real authorized playback. No audio persisted.",
+  "afterNaturalUnfilteredInconclusive": {
+    "pass": false,
+    "reliable": false,
+    "insertedTimeMs": 0.0,
+    "matches": [
+      {
+        "name": "tail",
+        "correlation": 0.91584,
+        "lagMs": 406.5
+      },
+      {
+        "name": "head-early",
+        "correlation": 0.96757,
+        "lagMs": 406.5
+      },
+      {
+        "name": "head-late",
+        "correlation": 0.88444,
+        "lagMs": 406.5
+      }
+    ],
+    "deviceRate": 48000,
+    "captureFlags": [],
+    "events": [
+      {
+        "name": "cancelNext",
+        "time": 164.899410430839,
+        "wall": 10732812.900000006,
+        "state": "running",
+        "start": 164.7031292517007,
+        "end": 376.8689569160998,
+        "offset": 0
+      },
+      {
+        "name": "play",
+        "time": 164.899410430839,
+        "wall": 10732815.5,
+        "state": "running",
+        "start": 164.7031292517007,
+        "end": 376.8689569160998,
+        "offset": 0
+      },
+      {
+        "name": "setRate",
+        "value": 1,
+        "time": 164.9400453514739,
+        "wall": 10732838.900000006,
+        "state": "running",
+        "start": 164.7031292517007,
+        "end": 376.8689569160998,
+        "offset": 0
+      },
+      {
+        "name": "queue",
+        "time": 165.38122448979593,
+        "wall": 10733285.800000012,
+        "state": "running",
+        "start": 164.7031292517007,
+        "end": 376.8689569160998,
+        "offset": 0
+      }
+    ],
+    "naturalPlaybackTest": true,
+    "audioSaved": false,
+    "finalCounters": {
+      "errors": 0,
+      "fallbacks": 0,
+      "unpreparedEnds": 0,
+      "currentMatchesOfficial": true
+    }
+  },
+  "afterNatural": {
+    "pass": true,
+    "reliable": true,
+    "insertedTimeMs": 0.0,
+    "matches": [
+      {
+        "name": "tail",
+        "correlation": 0.99879,
+        "lagMs": 316.25
+      },
+      {
+        "name": "head-early",
+        "correlation": 0.9995,
+        "lagMs": 316.25
+      },
+      {
+        "name": "head-late",
+        "correlation": 0.99825,
+        "lagMs": 316.25
+      }
+    ],
+    "deviceRate": 48000,
+    "captureFlags": [],
+    "events": [
+      {
+        "name": "cancelNext",
+        "time": 361.44181405895694,
+        "wall": 10929343.900000006,
+        "state": "running",
+        "start": 361.262925170068,
+        "end": 573.4287528344671,
+        "offset": 0
+      },
+      {
+        "name": "play",
+        "time": 361.4592290249433,
+        "wall": 10929349.400000006,
+        "state": "running",
+        "start": 361.262925170068,
+        "end": 573.4287528344671,
+        "offset": 0
+      },
+      {
+        "name": "setRate",
+        "value": 1,
+        "time": 361.4824489795918,
+        "wall": 10929379.400000006,
+        "state": "running",
+        "start": 361.262925170068,
+        "end": 573.4287528344671,
+        "offset": 0
+      },
+      {
+        "name": "queue",
+        "time": 362.04263038548754,
+        "wall": 10929935.600000024,
+        "state": "running",
+        "start": 361.262925170068,
+        "end": 573.4287528344671,
+        "offset": 0
+      }
+    ],
+    "naturalPlaybackTest": true,
+    "audioSaved": false,
+    "finalCounters": {
+      "errors": 0,
+      "fallbacks": 0,
+      "unpreparedEnds": 0,
+      "currentMatchesOfficial": true
+    },
+    "album": "Dawn FM",
+    "transition": [
+      "Dawn FM",
+      "Gasoline"
+    ]
+  },
+  "measurementValidation": {
+    "command": "python -m unittest discover -s tests -p test_handoff_measurement.py -v",
+    "pass": true,
+    "cases": [
+      "continuous output across 44100/48000 Hz",
+      "100 ms inserted interruption across 44100/48000 Hz"
+    ],
+    "referenceAndCaptureBandlimitedBeforeResampling": true
+  }
+}

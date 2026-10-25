@@ -1,0 +1,140 @@
+{
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.42.205594",
+  "rendering": {
+    "pass": true,
+    "cases": [
+      {
+        "name": "sample-continuity-44100",
+        "pass": true,
+        "channels": 2,
+        "frames": 18433,
+        "boundaryFrames": [
+          4230,
+          10379
+        ],
+        "maxError": 0
+      },
+      {
+        "name": "sample-continuity-48000",
+        "pass": true,
+        "channels": 2,
+        "frames": 18433,
+        "boundaryFrames": [
+          4230,
+          10379
+        ],
+        "maxError": 0
+      },
+      {
+        "name": "sample-continuity-96000",
+        "pass": true,
+        "channels": 2,
+        "frames": 18433,
+        "boundaryFrames": [
+          4230,
+          10379
+        ],
+        "maxError": 0
+      },
+      {
+        "name": "preserve-authored-silence",
+        "pass": true,
+        "silenceFrames": 100
+      },
+      {
+        "name": "explicit-codec-trim",
+        "pass": true,
+        "frames": 256
+      },
+      {
+        "name": "detect-inserted-gap",
+        "pass": true,
+        "deliberatelyWrongFrames": 32
+      },
+      {
+        "name": "detect-overlap",
+        "pass": true,
+        "deliberatelyWrongFrames": -32
+      },
+      {
+        "name": "invalid-sequence-plays-nothing",
+        "pass": true
+      }
+    ]
+  },
+  "decoding": [
+    {
+      "codec": "flac",
+      "sampleRate": 44100,
+      "segment": 0,
+      "expectedFrames": 8191,
+      "decodedFrames": 8191,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "mp3",
+      "sampleRate": 44100,
+      "segment": 0,
+      "expectedFrames": 8191,
+      "decodedFrames": 8191,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "flac",
+      "sampleRate": 44100,
+      "segment": 1,
+      "expectedFrames": 11003,
+      "decodedFrames": 11003,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "mp3",
+      "sampleRate": 44100,
+      "segment": 1,
+      "expectedFrames": 11003,
+      "decodedFrames": 11003,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "flac",
+      "sampleRate": 48000,
+      "segment": 0,
+      "expectedFrames": 8191,
+      "decodedFrames": 8191,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "mp3",
+      "sampleRate": 48000,
+      "segment": 0,
+      "expectedFrames": 8191,
+      "decodedFrames": 8191,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "flac",
+      "sampleRate": 48000,
+      "segment": 1,
+      "expectedFrames": 11003,
+      "decodedFrames": 11003,
+      "lengthMatches": true,
+      "channels": 2
+    },
+    {
+      "codec": "mp3",
+      "sampleRate": 48000,
+      "segment": 1,
+      "expectedFrames": 11003,
+      "decodedFrames": 11003,
+      "lengthMatches": true,
+      "channels": 2
+    }
+  ],
+  "noAudiblePlayback": true
+}

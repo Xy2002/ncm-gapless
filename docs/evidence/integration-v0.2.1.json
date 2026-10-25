@@ -1,0 +1,48 @@
+{
+  "pass": true,
+  "cases": [
+    {
+      "name": "engine-adjacent",
+      "pass": true,
+      "maxError": 0,
+      "boundaryDeltaFrames": 0
+    },
+    {
+      "name": "engine-cancel-queued",
+      "pass": true,
+      "maxError": 0,
+      "boundaryDeltaFrames": 0
+    },
+    {
+      "name": "engine-seek",
+      "pass": true,
+      "maxError": 0,
+      "boundaryDeltaFrames": 0
+    },
+    {
+      "name": "engine-pause-resume",
+      "pass": true,
+      "maxError": 0,
+      "boundaryDeltaFrames": 0
+    },
+    {
+      "name": "engine-same-rate-during-second-track",
+      "pass": true,
+      "maxError": 0,
+      "boundaryDeltaFrames": 0
+    },
+    {
+      "name": "official-sdk-positional-events",
+      "pass": true,
+      "consumers": 2,
+      "nestedArrayNegativeControl": true
+    },
+    {
+      "name": "application-versus-native-state",
+      "pass": true,
+      "applicationPlaying": 2,
+      "nativePlayingEvent": 1
+    }
+  ],
+  "noAudibleTestOutput": true
+}
