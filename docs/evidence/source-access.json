@@ -1,0 +1,39 @@
+{
+  "officialPrefetchCaptured": true,
+  "hasStreamUrl": true,
+  "hasLocalPath": false,
+  "officialAllowed": true,
+  "hasExtraHeaders": true,
+  "sourceScheme": "http:",
+  "extraHeaderKeys": [
+    "x-cdn-trace-tag",
+    "X-SONG-INFO"
+  ],
+  "httpOk": false,
+  "httpStatus": 403,
+  "responseType": "basic",
+  "httpsOk": false,
+  "httpsStatus": 403,
+  "officialHeadersOk": false,
+  "officialHeadersStatus": 403,
+  "errorSignals": [
+    "Forbidden"
+  ],
+  "nativeTransport": {
+    "scheme": "http:",
+    "keys": [
+      "blob",
+      "code",
+      "error",
+      "globalFailCount",
+      "globalSucCount",
+      "headers",
+      "retryTimes",
+      "status"
+    ],
+    "status": 403,
+    "code": 0,
+    "bodyType": "undefined",
+    "dataType": "undefined"
+  }
+}
