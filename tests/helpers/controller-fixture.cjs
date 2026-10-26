@@ -22,7 +22,7 @@ function fixture({ phase = 'fetch' } = {}) {
     return id;
   };
   const fetched = deferred(), decoded = deferred();
-  const nativeCalls = [], events = [], replays = [], actions = [], starts = [], requests = [];
+  const nativeCalls = [], events = [], restorations = [], actions = [], starts = [], requests = [];
   const track = { id: 'fixture-track' };
   const state = { playing: { playId: 'fixture-play', curPlaying: track, playingVolume: .5, playingSpeed: 1 },
     playingList: { curPlayingList: [] }, setting: { quantity: {} } };
@@ -43,8 +43,15 @@ function fixture({ phase = 'fetch' } = {}) {
     setInterval: (callback, delay) => schedule(callback, delay, delay), clearInterval: id => timers.delete(id),
     channel: { call: originalCall } };
   const client = { version: 'fixture', getState: () => state, subscribe: () => () => {}, nextInfo: async () => null,
+    callNative: originalCall,
+    intercept(handler) {
+      sandbox.channel.call = (name, callback, args) => handler(name, callback, args, originalCall);
+      return () => { sandbox.channel.call = originalCall; };
+    },
     store: { dispatch(action) { actions.push(action); } },
-    async replay(item) { replays.push({ item, bridgeRestored: sandbox.channel.call === originalCall }); },
+    async restorePlayback(item, position, wasPlaying, info, pending) {
+      restorations.push({ item, position, wasPlaying, info, pending, bridgeRestored: sandbox.channel.call === originalCall });
+    },
     emit(name, ...args) {
       events.push({ name, args });
       if (name === 'Load') sandbox.channel.call('audioplayer.play', () => {}, ['fixture-play', 'after-load']);
@@ -67,7 +74,7 @@ function fixture({ phase = 'fetch' } = {}) {
     let done = false;
     return { async read() { if (done) return { done: true }; done = true; return { done: false, value: new Uint8Array(8) }; } };
   } } });
-  return { sandbox, nativeCalls, events, replays, actions, starts, requests, contexts, timers, track, call, flush,
+  return { sandbox, nativeCalls, events, restorations, actions, starts, requests, contexts, timers, track, call, flush,
     begin() { sandbox.channel.call('audioplayer.load', () => {}, ['fixture-play', { songId: 'fixture-track', musicurl: 'https://music.126.net/synthetic.wav' }]); },
     async enterPhase() { if (phase === 'decode') { releaseFetch(); await flush(); } },
     async finish() { releaseFetch(); decoded.resolve(buffer); await flush(); },

@@ -6,8 +6,7 @@
     if (root.NcmGapless?.installed) return root.NcmGapless.status();
     options = Object.assign({ maximumDecodedBytes: 256 * 1024 * 1024, maximumEncodedBytes: 80 * 1024 * 1024 }, options);
     const client = root.NcmGaplessClient.discover(root);
-    const originalCall = root.channel.call;
-    const native = (name, callback, args) => originalCall.call(root.channel, name, callback || function () {}, args || []);
+    const native = (name, callback, args) => client.callNative(name, callback || function () {}, args || []);
     let context = new root.AudioContext({ latencyHint: 'playback', sampleRate: 48000 });
     const counters = { loads: 0, decoded: 0, prepared: 0, transitions: 0, unpreparedEnds: 0, fallbacks: 0,
       cancelledPrefetch: 0, errors: 0, lastError: null, lastBoundaryDeltaFrames: null, lastSourceCapabilities: null, aacTimingFixes: 0, officialRefreshes: 0 };
@@ -169,7 +168,7 @@
       const oldId = client.getState().playing.playId;
       native('audioplayer.stop', null, [oldId]);
       const abort = new AbortController(); loadController = abort;
-      const pending = { id, paused: false }; loading = pending;
+      const pending = { id, info, paused: false }; loading = pending;
       let timedOut = false;
       const deadline = setTimeout(() => { timedOut = true; abort.abort(); }, 30000);
       counters.loads++; acknowledge(callback);
@@ -189,9 +188,9 @@
       const id = argument && typeof argument === 'object' ? argument.playId : argument;
       return current && (id === current.id || id === undefined || id === '');
     }
-    const hook = function (name, callback, args) {
+    const hook = function (name, callback, args, forward) {
       args = args || [];
-      if (!installed) return originalCall.apply(this, arguments);
+      if (!installed) return forward(name, callback, args);
       const pendingId = args[0] && typeof args[0] === 'object' ? args[0].playId : args[0];
       if (loading && (pendingId === loading.id || pendingId === undefined || pendingId === '')) {
         if (name === 'audioplayer.pause' || name === 'audioplayer.play') {
@@ -212,7 +211,7 @@
         if (supported(args[1])) return load(args[0], args[1], callback);
         generation++; loadController?.abort(); loading = null; cancelPreparation(); engine.clear(); current = null; handoff = null;
         counters.fallbacks++;
-        return originalCall.apply(this, arguments);
+        return forward(name, callback, args);
       }
       if (name === 'audioplayer.getPlayedTime' || name === 'audioplayer.getPlaybackInfo') {
         const id = typeof args[0] === 'object' ? args[0]?.playId : args[0];
@@ -268,10 +267,10 @@
           return;
         }
       }
-      return originalCall.apply(this, arguments);
+      return forward(name, callback, args);
     };
 
-    root.channel.call = hook;
+    const restoreCalls = client.intercept(hook);
     const unsubscribe = client.subscribe(() => {
       if (!current || !installed) return;
       const state = client.getState();
@@ -287,10 +286,10 @@
     }, 100);
 
     const api = {
-      version: '0.2.2-experimental', installed: true,
+      version: '0.3.1-experimental', installed: true,
       install: function () { return api.status(); },
       status: function () {
-        return Object.assign({ version: api.version, installed, clientVersion: client.version,
+        return Object.assign({ version: api.version, installed, clientVersion: client.version, platform: client.platform,
           active: !!current, contextState: context.state, sampleRate: context.sampleRate, playbackRate: engine.rate, playing: engine.playing,
           position: engine.position(), duration: engine.current?.buffer.duration || 0,
           nextReady: !!engine.next, waitingForOfficialHandoff: !!handoff,
@@ -304,17 +303,16 @@
         if (!installed) return { installed: false };
         const item = client.getState().playing.curPlaying;
         const pending = loading;
+        const info = pending?.info || current?.info;
         const position = pending ? 0 : engine.position();
         const wasPlaying = pending ? !pending.paused : engine.playing;
         const wasActive = !!current || !!pending;
         installed = false; api.installed = false; generation++; loadController?.abort(); loading = null; cancelPreparation();
         clearInterval(tickTimer); unsubscribe();
-        if (root.channel.call === hook) root.channel.call = originalCall;
+        restoreCalls();
         await engine.close(); current = null; handoff = null;
         if (wasActive && item) {
-          await client.replay(item);
-          client.store.dispatch({ type: 'playing/setPlayingPosition', payload: { duration: position } });
-          if (!wasPlaying) client.store.dispatch({ type: 'playing/pause', payload: { triggerScene: 'unknown' } });
+          await client.restorePlayback(item, position, wasPlaying, info, !!pending);
         }
         return { installed: false, officialPlaybackRestored: wasActive && !!item };
       },

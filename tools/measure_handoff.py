@@ -10,7 +10,6 @@ from pathlib import Path
 import time
 
 import numpy as np
-import pyaudiowpatch as pa
 from check_source_access import value
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +30,7 @@ def locate(audio, reference):
     """Normalized matched-filter lag; reference must contain non-silent music."""
     reference = reference.astype(np.float64)
     reference -= reference.mean()
-    energy = float(reference @ reference)
+    energy = float(np.sum(reference * reference))
     if energy < 1e-8:
         raise RuntimeError('REFERENCE_IS_SILENT')
     size = 1 << (len(audio) + len(reference) - 1).bit_length()
@@ -68,6 +67,10 @@ def main():
     parser.add_argument('--output', default='.local/handoff-measurement.json')
     parser.add_argument('--natural', action='store_true', help='Wait for the current track tail without seeking')
     args = parser.parse_args()
+    try:
+        import pyaudiowpatch as pa
+    except ImportError:
+        parser.error('WASAPI capture requires Windows and PyAudioWPatch; numerical analysis is cross-platform')
     read = lambda code: value(args.port, code, user_gesture=True)
     initial = read('window.NcmGapless.status()')
     if not initial.get('active') or not initial.get('playing') or not initial.get('nextReady') or initial.get('playbackRate') != 1:

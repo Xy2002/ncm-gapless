@@ -4,15 +4,16 @@
 
 ## 本地开发
 
-补丁运行只需要当前已适配的网易云客户端与 Windows PowerShell。控制流和 AAC 元数据回归需要支持 `node --test` 的 Node.js，生成媒体与回录分析验证额外需要 Python、FFmpeg。
+Windows 补丁运行需要已适配客户端与 Windows PowerShell；macOS 运行需要 Python 3，启动器会自动安装运行依赖，使用步骤见 [macOS 文档](docs/macos.md)。开发验证额外需要 Python、FFmpeg；JavaScript 检查使用 Node.js。
 
 ```powershell
 python -m pip install -r requirements-dev.txt
 node --test tests/controller.test.cjs tests/aac-timing.test.cjs
+node --test tests/client-adapter.test.js tests/verify-disable.test.js
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-上述 Node.js 测试执行真实控制器、引擎和 AAC 解析逻辑，以可控客户端 / 音频节点和虚拟时钟覆盖下载、解码、暂停恢复与卸载状态；AAC 元数据用例没有真实音频包。Python 测试检查回录分析方法。这两类测试均不打开声卡、不连接网易云，不等于实际客户端验收。
+上述测试检查控制流、AAC 解析、平台适配、启动器、打包和回录分析，使用可控 I/O，不连接客户端或驱动声卡。
 
 连接已通过启动器启用的目标客户端后：
 
@@ -32,7 +33,7 @@ python tools\patch_control.py status
 | `verify_integration.py` | 离线渲染实际引擎并检查官方事件参数契约 |
 | `check_controls.py` | 实际暂停、恢复和定位当前曲目，会改变播放位置 |
 | `observe_transition.py` | 观察自然播放的调度和状态，不证明声卡输出连续 |
-| `measure_handoff.py` | 默认定位至当前曲尾，短时回录默认输出设备，仅在内存对比 |
+| `measure_handoff.py` | Windows WASAPI 专用；默认定位至当前曲尾，短时回录默认输出设备，仅在内存对比 |
 | `measure_handoff.py --natural` | 等待当前曲目自然结束后测量，不定位、暂停或变速 |
 | `tools/inspect-*.js` 等诊断脚本 | 研究用途，运行前阅读脚本；不进入便携包 |
 
@@ -55,3 +56,9 @@ python tools\build_portable.py
 ```
 
 打包工具按清单收集运行文件与脱敏文档，生成 `artifacts/` 下的 ZIP 和包内 SHA-256 清单。研究脚本、开发依赖和本机记录不进入运行包。
+
+默认生成 Windows 包；`python3 tools/build_portable.py --platform macos` 生成 Mac 包。Mac 包包含启动器必需的两个 Python 模块及运行依赖清单，不包含虚拟环境和开发诊断脚本。`.command` 在包内保留执行权限。
+
+## 技术记录
+
+实现与历史问题见 [实现记录](docs/implementation.md)。平台数据见 [兼容说明](compatibility.json)，运行记录保存在 [docs/evidence](docs/evidence/)。这些记录按版本保留，不能替代其他设备和版本的运行检查。

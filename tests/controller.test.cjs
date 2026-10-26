@@ -10,18 +10,20 @@ for (const phase of ['fetch', 'decode']) {
       const result = await f.sandbox.NcmGapless.uninstall();
       assert.equal(f.nativeCalls.some(call => call.name === 'audioplayer.stop'), true);
       assert.equal(result.officialPlaybackRestored, true, 'pending takeover must restore the native track');
-      assert.equal(f.replays.length, 1);
-      assert.equal(f.replays[0].item, f.track);
-      assert.equal(f.replays[0].bridgeRestored, true);
+      assert.equal(f.restorations.length, 1);
+      assert.equal(f.restorations[0].item, f.track);
+      assert.equal(f.restorations[0].bridgeRestored, true);
+      assert.equal(f.restorations[0].pending, true);
+      assert.equal(f.restorations[0].info.songId, 'fixture-track');
       const paused = commands.at(-1) === 'pause';
-      assert.equal(f.actions.some(action => action.type === 'playing/pause'), paused, 'restore the latest requested state');
-      assert.equal(f.actions.find(action => action.type === 'playing/setPlayingPosition').payload.duration, 0);
+      assert.equal(f.restorations[0].wasPlaying, !paused, 'restore the latest requested state');
+      assert.equal(f.restorations[0].position, 0);
       assert.equal(f.requests[0].signal.aborted, true);
       await f.finish();
       assert.equal(f.events.some(event => event.name === 'Load'), false, 'late decode must not restart an uninstalled patch');
       assert.equal(f.starts.length, 0);
       await f.sandbox.NcmGapless.uninstall();
-      assert.equal(f.replays.length, 1, 'uninstall remains idempotent');
+      assert.equal(f.restorations.length, 1, 'uninstall remains idempotent');
     });
   }
   for (const commands of [['pause'], ['pause', 'play'], ['pause', 'play', 'pause'], ['pause', 'play', 'pause', 'play']]) {
@@ -57,7 +59,7 @@ test('a stopped pending load is not replayed by uninstall', async t => {
   const f = fixture(); t.after(() => f.close()); f.begin(); f.call('stop');
   const result = await f.sandbox.NcmGapless.uninstall();
   assert.equal(result.officialPlaybackRestored, false);
-  assert.equal(f.replays.length, 0);
+  assert.equal(f.restorations.length, 0);
 });
 
 test('uninstall still restores a decoded track at its current paused position', async t => {
@@ -67,6 +69,7 @@ test('uninstall still restores a decoded track at its current paused position', 
   assert.equal(position, .25);
   const result = await f.sandbox.NcmGapless.uninstall();
   assert.equal(result.officialPlaybackRestored, true);
-  assert.equal(f.actions.find(action => action.type === 'playing/setPlayingPosition').payload.duration, position);
-  assert.equal(f.actions.some(action => action.type === 'playing/pause'), true);
+  assert.equal(f.restorations[0].position, position);
+  assert.equal(f.restorations[0].wasPlaying, false);
+  assert.equal(f.restorations[0].pending, false);
 });

@@ -6,8 +6,10 @@
 
   function discover(target) {
     const version = /NeteaseMusicDesktop\/([\d.]+)/.exec(target.navigator.userAgent);
-    if (!version || version[1] !== '3.1.42.205594') throw new Error('CLIENT_VERSION_UNVERIFIED');
-    if (!target.channel || typeof target.channel.call !== 'function' || !target.webpackJsonp) throw new Error('CLIENT_BRIDGE_MISSING');
+    const platform = /Macintosh/.test(target.navigator.userAgent) ? 'macos' : /Windows NT/.test(target.navigator.userAgent) ? 'windows' : null;
+    const versions = { windows: '3.1.42.205594', macos: '3.1.12.3444' };
+    if (!version || !platform || version[1] !== versions[platform]) throw new Error('CLIENT_VERSION_UNVERIFIED');
+    if (!target.webpackJsonp || (platform === 'windows' ? typeof target.channel?.call !== 'function' : typeof target.ncmChannelOSX?.postMessage !== 'function')) throw new Error('CLIENT_BRIDGE_MISSING');
     if (target.__ncmGapless) throw new Error('OLD_PATCH_STILL_LOADED');
     let require;
     const key = '__ncm_gapless_adapter_' + Date.now();
@@ -42,6 +44,27 @@
       pending.push(fiber.child, fiber.sibling);
     }
     if (!sdk || !preload || !refresh || !store || !states || !store.getState().playingList) throw new Error('PLAYBACK_INTERFACE_MISSING');
+    const bridges = platform === 'windows' ? [target.channel] : [...new Set([sdk.Bridge._Adapter, target.legacyNativeCmder?._envAdapter].filter(Boolean))];
+    const callMethod = platform === 'windows' ? 'call' : 'callAdapter';
+    if (bridges.some(bridge => typeof bridge[callMethod] !== 'function' || (platform === 'macos' && typeof bridge._registerCallQueue !== 'function'))) throw new Error('CLIENT_BRIDGE_MISSING');
+    const callNative = bridges[0][callMethod].bind(bridges[0]);
+
+    function intercept(handler) {
+      const patches = bridges.map(bridge => {
+        const descriptor = Object.getOwnPropertyDescriptor(bridge, callMethod);
+        const forward = bridge[callMethod].bind(bridge);
+        const hook = (name, callback, args) => handler(name, callback, args, forward);
+        bridge[callMethod] = hook;
+        return { bridge, descriptor, hook };
+      });
+      return function () {
+        for (const { bridge, descriptor, hook } of patches) {
+          if (bridge[callMethod] !== hook) continue;
+          if (descriptor) Object.defineProperty(bridge, callMethod, descriptor);
+          else delete bridge[callMethod];
+        }
+      };
+    }
 
     let prefetchBusy = false;
     async function nextInfo(signal) {
@@ -110,13 +133,64 @@
         clearTimeout(timer); if (abortHandler) signal?.removeEventListener('abort', abortHandler);
       }
     }
-    return { version: version[1], sdk: sdk, states: states, store: store, nextInfo: nextInfo, refreshInfo, emit: emit,
+    return { version: version[1], platform, sdk: sdk, states: states, store: store, nextInfo: nextInfo, refreshInfo, emit: emit, callNative, intercept,
       getState: () => store.getState(), subscribe: callback => store.subscribe(callback),
       replay: function (item) {
         return store.dispatch({ type: 'playing/setPlaying', payload: {
           trackIn: item || store.getState().playing.curPlaying, playingState: states.Playing, flag: 0,
           fromType: 'call', triggerScene: 'unknown', isForceSetPlaying: true, noAddToHistory: true,
         } });
+      },
+      restorePlayback: async function (item, position, wasPlaying, info, pending) {
+        if (platform === 'windows') {
+          await this.replay(item);
+          store.dispatch({ type: 'playing/setPlayingPosition', payload: { duration: position } });
+          if (!wasPlaying) await store.dispatch({ type: 'playing/pause', payload: { triggerScene: 'unknown' } });
+          return;
+        }
+        const playId = String(pending ? info?.songId : store.getState().playing.playId);
+        const tag = 'ncm-gapless-restore';
+        const wait = (name, matches) => sdk.Bridge.createPromiseFromNativeRegisterCall(name, 'audioplayer', {
+          timeout: 10000, filter_result: (_, args) => String(args[0]) === playId && (!matches || matches(args)),
+        });
+        if (!info?.musicurl || String(info.songId) !== playId) throw new Error('NATIVE_RESTORE_SOURCE_MISMATCH');
+        if (pending) {
+          // Replace the unfinished official load, then wait for its new SDK play to finish.
+          const player = sdk.AudioPlayer, original = player.play;
+          const descriptor = Object.getOwnPropertyDescriptor(player, 'play');
+          let timer, capture;
+          const replayed = new Promise((resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('NATIVE_RESTORE_TIMEOUT')), 10000);
+            capture = resolve;
+          });
+          const hook = function (source) {
+            const result = original.apply(this, arguments);
+            if (String(source?.songId) === playId) capture(result);
+            return result;
+          };
+          player.play = hook;
+          try { await Promise.all([replayed, this.replay(item)]); }
+          finally {
+            clearTimeout(timer);
+            if (player.play === hook) {
+              if (descriptor) Object.defineProperty(player, 'play', descriptor);
+              else delete player.play;
+            }
+          }
+        } else {
+          // Reusing the loaded source avoids a background queue replay overwriting pause.
+          await sdk.AudioPlayer.play(info);
+        }
+        if (String(store.getState().playing.playId) !== playId) throw new Error('NATIVE_RESTORE_CANCELLED');
+        // Register before calling: Mac Seek can arrive before the command ack.
+        const [seek] = await Promise.all([wait('Seek', args => args[1] === tag),
+          sdk.Bridge.call('audioplayer.seek', playId, tag, position)]);
+        if (Number(seek[2]) !== 0) throw new Error('NATIVE_RESTORE_SEEK_FAILED');
+        if (!wasPlaying) {
+          await Promise.all([wait('PlayState', args => Number(args[2]) === 2),
+            store.dispatch({ type: 'playing/pause', payload: { triggerScene: 'unknown' } })]);
+          if (String(store.getState().playing.playId) !== playId) throw new Error('NATIVE_RESTORE_CANCELLED');
+        }
       } };
   }
   return Object.freeze({ discover: discover });

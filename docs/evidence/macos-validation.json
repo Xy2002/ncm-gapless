@@ -1,0 +1,180 @@
+{
+  "date": "2026-10-26",
+  "patchVersion": "0.3.0-experimental",
+  "platform": "macos",
+  "environment": {
+    "macosVersion": "27.0.1",
+    "macosBuild": "26A434",
+    "hostArchitecture": "arm64",
+    "clientVersion": "3.1.12.3444",
+    "clientBinaryArchitectures": [
+      "x86_64",
+      "arm64"
+    ],
+    "chromiumVersion": "116.0.5845.190",
+    "userAgentChromeVersion": "120.0.0.0",
+    "pythonVersion": "3.13.2"
+  },
+  "appBundleModified": false,
+  "appSignatureVerification": "codesign --verify --deep --strict passed",
+  "offlineAudio": {
+    "pass": true,
+    "renderingCases": 8,
+    "maximumRenderedError": 0,
+    "decodingCases": 16,
+    "allDecodedFrameCountsMatch": true,
+    "maximumAacReferenceError": 5.960464477539063e-08
+  },
+  "engineAndEventContract": {
+    "pass": true,
+    "cases": [
+      {
+        "name": "engine-adjacent",
+        "pass": true,
+        "maxError": 0,
+        "boundaryDeltaFrames": 0
+      },
+      {
+        "name": "engine-cancel-queued",
+        "pass": true,
+        "maxError": 0,
+        "boundaryDeltaFrames": 0
+      },
+      {
+        "name": "engine-seek",
+        "pass": true,
+        "maxError": 0,
+        "boundaryDeltaFrames": 0
+      },
+      {
+        "name": "engine-pause-resume",
+        "pass": true,
+        "maxError": 0,
+        "boundaryDeltaFrames": 0
+      },
+      {
+        "name": "engine-same-rate-during-second-track",
+        "pass": true,
+        "maxError": 0,
+        "boundaryDeltaFrames": 0
+      },
+      {
+        "name": "official-sdk-positional-events",
+        "pass": true,
+        "consumers": 2,
+        "nestedArrayNegativeControl": true
+      },
+      {
+        "name": "application-versus-native-state",
+        "pass": true,
+        "applicationPlaying": 2,
+        "nativePlayingEvent": 1
+      }
+    ],
+    "noAudibleTestOutput": true
+  },
+  "officialControls": {
+    "pass": true,
+    "cases": [
+      "pause-freezes-audio-clock",
+      "resume-advances",
+      "paused-seek-replies-and-stays-paused",
+      "seek-resume-synchronizes"
+    ],
+    "officialStateMatches": true,
+    "errors": 0,
+    "fallbacks": 0
+  },
+  "authorizedSource": {
+    "format": "flac",
+    "currentDecoded": true,
+    "nextDecodedAndScheduled": true,
+    "trial": false
+  },
+  "outputDeviceLoopbackRecorded": false,
+  "subjectiveListeningVerified": false,
+  "audioSaved": false,
+  "unverified": [
+    "output-device-loopback",
+    "subjective-listening-acceptance",
+    "intel-runtime",
+    "other-client-and-macos-versions",
+    "native-effects-and-system-media-controls",
+    "bluetooth"
+  ],
+  "naturalPlaybackObservation": {
+    "pass": true,
+    "observationOnly": true,
+    "observedSeconds": 208.688,
+    "sourceStartedFromBeginning": true,
+    "seekDuringObservation": false,
+    "pauseDuringObservation": false,
+    "playbackRate": 1,
+    "transitions": 1,
+    "lastBoundaryDeltaFrames": 0,
+    "currentMatchesOfficial": true,
+    "waitingForOfficialHandoff": false,
+    "playingAfterHandoff": true,
+    "errors": 0,
+    "fallbacks": 0,
+    "unpreparedEnds": 0,
+    "outputDeviceLoopbackRecorded": false
+  },
+  "disable": {
+    "pass": true,
+    "installed": false,
+    "originalBridgeRestored": true,
+    "nativeProgressEvents": 34,
+    "nativePosition": 21.54,
+    "positionRestored": true,
+    "requestedRestorePosition": 19.961333333333332,
+    "officialPlaying": true,
+    "restoreRequested": true
+  },
+  "coldStart": {
+    "pass": true,
+    "coldLaunch": true,
+    "portAutomaticallyChosen": 64272,
+    "defaultPortOccupied": true,
+    "existingPortReused": true,
+    "repeatInstallIdempotent": true,
+    "statusAfterStop": false,
+    "launchedFromDifferentWorkingDirectory": true,
+    "originalPausedStateRestored": true,
+    "clientVersion": "3.1.12.3444"
+  },
+  "nativePositionRestore": {
+    "pass": true,
+    "requestedPosition": 19.961333333333332,
+    "nativePosition": 25.02,
+    "officialPlaying": true,
+    "disable": {
+      "pass": true,
+      "installed": false,
+      "originalBridgeRestored": true,
+      "nativeProgressEvents": 34,
+      "nativePosition": 21.54,
+      "positionRestored": true,
+      "requestedRestorePosition": 19.961333333333332,
+      "officialPlaying": true,
+      "restoreRequested": true
+    }
+  },
+  "automatedTests": {
+    "nodeTests": 10,
+    "pythonTests": 10,
+    "pass": true
+  },
+  "pausedDisable": {
+    "pass": true,
+    "positionBeforeDisable": 0,
+    "pausedBeforeDisable": true,
+    "officialPausedAfterDisable": true,
+    "nativePlayedTimeDeltaWhilePaused": 0.0
+  },
+  "afterTesting": {
+    "patchDisabled": true,
+    "originalPositionRestored": true,
+    "officialPaused": true
+  }
+}
