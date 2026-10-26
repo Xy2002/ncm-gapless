@@ -1,0 +1,57 @@
+{
+  "version": "0.2.2-experimental",
+  "date": "2026-10-26",
+  "baseCommit": "fd0098be85d2e91cc56fd4ce2dd9477c7e2eb9f9",
+  "reviewedCommit": "7e145c4cc76706bb14862e06b32550d3ff95b06b",
+  "findings": [
+    {
+      "comment": "https://github.com/Xy2002/ncm-gapless/pull/1#discussion_r4372208256",
+      "fix": "restore a pending takeover through the original bridge with the latest requested paused/playing state"
+    },
+    {
+      "comment": "https://github.com/Xy2002/ncm-gapless/pull/1#discussion_r4372208259",
+      "fix": "acknowledge both play and pause while loading; retain latest intent until decoded playback"
+    },
+    {
+      "comment": "https://github.com/Xy2002/ncm-gapless/pull/1#discussion_r4372208262",
+      "fix": "check original AAC endpoint evidence before assigning an edit duration to the valid range"
+    }
+  ],
+  "nodeRegressions": {
+    "command": "node --test tests/controller.test.cjs tests/aac-timing.test.cjs",
+    "runtime": "v24.22.1",
+    "before": {
+      "tests": 27,
+      "pass": 9,
+      "fail": 18
+    },
+    "after": {
+      "tests": 27,
+      "pass": 27,
+      "fail": 0,
+      "skipped": 0
+    },
+    "usesRealControllerEngineAndAacParser": true,
+    "externalIoAndAudioNodes": "controlled test doubles",
+    "clock": "virtual; no wall-clock waits",
+    "realClientRequired": false,
+    "audibleOutput": false
+  },
+  "cefOfflineValidation": {
+    "clientVersion": "3.1.42.205594",
+    "renderingCases": 8,
+    "renderingPass": true,
+    "decodeCases": 16,
+    "decodePass": true,
+    "maximumReferenceError": 1.1920928955078125e-07,
+    "engineAndEventCases": 7,
+    "engineAndEventPass": true,
+    "audibleOutput": false
+  },
+  "limits": [
+    "No new 0.2.2 natural-output recording or subjective listening acceptance is claimed.",
+    "Lifecycle regressions use controlled client/audio boundaries; they are not new live-client uninstall acceptance.",
+    "Ambiguous full-packet AAC with coarse edit timing now falls back instead of being reported sample accurate."
+  ],
+  "containsAccountDataOrMusic": false
+}

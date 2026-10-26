@@ -17,13 +17,14 @@ FILES = [
     "docs/evidence/controls.json", "docs/evidence/disable.json", "docs/evidence/cold-start.json",
     "docs/evidence/dawn-fm-natural-1.json", "docs/evidence/dawn-fm-natural-2.json",
     "docs/evidence/handoff-v0.2.1.json", "docs/evidence/integration-v0.2.1.json",
+    "docs/evidence/review-fixes-v0.2.2.json",
 ]
 
 
 def main():
-    output = ROOT / "artifacts" / "ncm-gapless-0.2.1-windows.zip"
+    output = ROOT / "artifacts" / "ncm-gapless-0.2.2-windows.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
-    manifest = {"version": "0.2.1-experimental", "clientVersion": "3.1.42.205594", "sha256": {}}
+    manifest = {"version": "0.2.2-experimental", "clientVersion": "3.1.42.205594", "sha256": {}}
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in FILES:
             data = (ROOT / name).read_bytes()

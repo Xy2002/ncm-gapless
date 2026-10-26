@@ -4,14 +4,15 @@
 
 ## 本地开发
 
-补丁运行只需要当前已适配的网易云客户端与 Windows PowerShell。开发验证额外需要 Python、FFmpeg；JavaScript 语法检查可以使用 Node.js。
+补丁运行只需要当前已适配的网易云客户端与 Windows PowerShell。控制流和 AAC 元数据回归需要支持 `node --test` 的 Node.js，生成媒体与回录分析验证额外需要 Python、FFmpeg。
 
 ```powershell
 python -m pip install -r requirements-dev.txt
+node --test tests/controller.test.cjs tests/aac-timing.test.cjs
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-上述 Python 测试检查回录分析方法，不打开声卡、不连接网易云。它不等于实际客户端验收。
+上述 Node.js 测试执行真实控制器、引擎和 AAC 解析逻辑，以可控客户端 / 音频节点和虚拟时钟覆盖下载、解码、暂停恢复与卸载状态；AAC 元数据用例没有真实音频包。Python 测试检查回录分析方法。这两类测试均不打开声卡、不连接网易云，不等于实际客户端验收。
 
 连接已通过启动器启用的目标客户端后：
 
