@@ -192,11 +192,14 @@
     const hook = function (name, callback, args) {
       args = args || [];
       if (!installed) return originalCall.apply(this, arguments);
-      if (loading && (args[0] === loading.id || args[0] === '') && name === 'audioplayer.pause') {
-        loading.paused = true; acknowledge(callback); return;
-      }
-      if (loading && (args[0] === loading.id || args[0] === '') && name === 'audioplayer.stop') {
-        generation++; loadController?.abort(); loading = null; acknowledge(callback); return;
+      const pendingId = args[0] && typeof args[0] === 'object' ? args[0].playId : args[0];
+      if (loading && (pendingId === loading.id || pendingId === undefined || pendingId === '')) {
+        if (name === 'audioplayer.pause' || name === 'audioplayer.play') {
+          loading.paused = name === 'audioplayer.pause'; acknowledge(callback); return;
+        }
+        if (name === 'audioplayer.stop') {
+          generation++; loadController?.abort(); loading = null; acknowledge(callback); return;
+        }
       }
       if (name === 'audioplayer.load') {
         let sourceUrl; try { sourceUrl = new URL(args[1]?.musicurl); } catch (_) {}
@@ -284,7 +287,7 @@
     }, 100);
 
     const api = {
-      version: '0.2.1-experimental', installed: true,
+      version: '0.2.2-experimental', installed: true,
       install: function () { return api.status(); },
       status: function () {
         return Object.assign({ version: api.version, installed, clientVersion: client.version,
@@ -300,8 +303,11 @@
       uninstall: async function () {
         if (!installed) return { installed: false };
         const item = client.getState().playing.curPlaying;
-        const position = engine.position(); const wasPlaying = engine.playing; const wasActive = !!current;
-        installed = false; api.installed = false; generation++; loadController?.abort(); cancelPreparation();
+        const pending = loading;
+        const position = pending ? 0 : engine.position();
+        const wasPlaying = pending ? !pending.paused : engine.playing;
+        const wasActive = !!current || !!pending;
+        installed = false; api.installed = false; generation++; loadController?.abort(); loading = null; cancelPreparation();
         clearInterval(tickTimer); unsubscribe();
         if (root.channel.call === hook) root.channel.call = originalCall;
         await engine.close(); current = null; handoff = null;
@@ -310,7 +316,7 @@
           client.store.dispatch({ type: 'playing/setPlayingPosition', payload: { duration: position } });
           if (!wasPlaying) client.store.dispatch({ type: 'playing/pause', payload: { triggerScene: 'unknown' } });
         }
-        return { installed: false, officialPlaybackRestored: wasActive };
+        return { installed: false, officialPlaybackRestored: wasActive && !!item };
       },
     };
     root.NcmGapless = api;

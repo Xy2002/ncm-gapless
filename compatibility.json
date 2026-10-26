@@ -42,7 +42,7 @@
     "native-effects-spatial-audio",
     "smtc-and-bluetooth"
   ],
-  "version": "0.2.1-experimental",
+  "version": "0.2.2-experimental",
   "experimentalPatchAvailable": true,
   "requiresLauncherAfterClientRestart": true
 }

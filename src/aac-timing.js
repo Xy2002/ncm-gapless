@@ -105,6 +105,12 @@
     const precision = timing.scale / movieTiming.scale;
     const editTicks = editDuration * precision;
     const preciseTail = lastDelta * sampleRate / timing.scale < 1024;
+    // An integer conversion of coarse movie ticks does not establish the
+    // original PCM endpoint. Check the original evidence before replacing it:
+    // either the sample table has a precise tail, or an edit tick is at most
+    // one source sample. Frame integrality is checked separately below.
+    const sampleAccurateEdit = movieTiming.scale >= sampleRate;
+    require(preciseTail || sampleAccurateEdit, 'AAC_END_PADDING_AMBIGUOUS');
     const fullEditRounded = Math.abs(editTicks - validTicks) <= precision + 1 && preciseTail;
     if (!fullEditRounded) {
       if (Number.isSafeInteger(editTicks) && editTicks > 0 && editTicks <= validTicks) validTicks = editTicks;

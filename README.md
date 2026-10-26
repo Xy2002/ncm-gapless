@@ -4,7 +4,7 @@
 
 像 The Weeknd 的《Dawn FM》这样的专辑，曲目之间的衔接本身就是作品的一部分。NCM Gapless 尝试提前准备下一首，并让两首歌曲在同一个音频时钟上相接，减少切歌时加载和重新启动带来的中断。
 
-**当前版本：`0.2.1-experimental`。当前可运行实现面向 Windows；macOS 版已列入路线图，尚未实现。** 项目名不绑定操作系统，后续按平台增加适配器。
+**当前版本：`0.2.2-experimental`。当前可运行实现面向 Windows；macOS 版已列入路线图，尚未实现。** 项目名不绑定操作系统，后续按平台增加适配器。
 
 ## 目前能用到什么程度
 
@@ -85,6 +85,14 @@ flowchart LR
 
 这个问题在声卡回录中产生了约 **100.6 毫秒**的额外停顿。0.2.1 对相同倍速直接返回，避免重启当前音源。对应离线回归用例修复前失败、修复后逐采样误差为 0；真实自然换歌回录也不再测得这次额外停顿。
 
+### 0.2.2 的审查修复
+
+- 下载或解码尚未完成时停用补丁，也会恢复官方播放，并保留最后一次暂停 / 播放选择。
+- 加载期间的暂停和恢复由同一待加载状态记录，完成解码后遵循最后一次请求。
+- 对只有完整 AAC 包的布局，在覆盖有效时长前检查原始精度依据。粗粒度编辑时长即使能换算成整数采样数，也不再被当成精确终点。
+
+27 个无需账号、网络或声卡的 Node.js 回归用例覆盖这些路径及精确 AAC 布局对照。测试调用真实控制器、引擎和时长解析代码；外部客户端、解码器和音频节点使用可控替身。结果与验证边界见 [0.2.2 审查修复记录](docs/evidence/review-fixes-v0.2.2.json)。
+
 ## 验证结果
 
 截至 2026-10-26，已保留下列测试记录：
@@ -107,7 +115,7 @@ flowchart LR
 
 - 首次选曲需要完整缓冲当前曲目；解码缓冲预算为 256 MiB。长音轨、网络失败或超出预算时可能回退。
 - 当前支持具有有效播放信息的 MP3、FLAC、WAV，以及通过严格时长检查的单音轨 AAC/M4A。真实专辑验收主要使用官方提供的 AAC/M4A；其他格式的证明主要来自生成样本。
-- 部分 AAC 布局只有粗粒度编辑时长，且缺少可确定的尾部有效采样数，会报 `AAC_INTENTIONAL_EDIT_UNSUPPORTED` 并回退。该问题仍待处理，相关曲目不保证无缝。
+- 部分 AAC 布局只有粗粒度编辑时长，且缺少可确定的尾部有效采样数，会报 `AAC_END_PADDING_AMBIGUOUS` 或 `AAC_INTENTIONAL_EDIT_UNSUPPORTED` 并回退。0.2.2 收紧了此前可能误接受的布局，相关曲目不保证无缝。
 - 只有加密本地缓存路径、试听或其他权限不满足的音源不接管。项目不提供会员或版权限制绕过、缓存解密或替代音源。
 - 实验引擎尚未复现官方原生音效链。空间音频、特殊增强音质、独占设备、蓝牙、系统媒体控制和混合采样率播放仍需单独验收。
 - 随机播放、单曲循环、动态修改队列、切换音质或设备等复杂场景尚未完整覆盖。
@@ -136,10 +144,11 @@ tools/                   启动、打包、检查与开发诊断工具
 docs/evidence/           不含账号或音源内容的验证记录
 ```
 
-贡献前请阅读 [CONTRIBUTING](CONTRIBUTING.md)。开发验证需要 Python、FFmpeg 和 `requirements-dev.txt` 中的依赖；便携运行不需要这些依赖。
+贡献前请阅读 [CONTRIBUTING](CONTRIBUTING.md)。开发验证需要 Node.js、Python、FFmpeg 和 `requirements-dev.txt` 中的依赖；便携运行不需要这些依赖。
 
 ```powershell
 python -m pip install -r requirements-dev.txt
+node --test tests/controller.test.cjs tests/aac-timing.test.cjs
 python -m unittest discover -s tests -p "test_*.py" -v
 python tools\verify_audio.py
 python tools\verify_integration.py
