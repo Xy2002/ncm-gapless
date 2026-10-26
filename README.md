@@ -1,6 +1,8 @@
-# NCM Gapless
+# NCM Gapless · 网易云音乐无缝播放补丁
 
-为网易云音乐桌面客户端提供无缝播放。提前准备下一首，在同一个音频时钟上接续播放，保留曲目本身的静音，不使用交叉淡化。
+为 Windows 和 macOS 的网易云音乐桌面客户端提供实验性无缝播放。提前准备下一首，在同一个音频时钟上接续播放，保留曲目本身的静音，不使用交叉淡化。
+
+[中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
 
 当前版本：`0.3.1-experimental`。
 

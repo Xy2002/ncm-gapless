@@ -15,6 +15,8 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 上述测试检查控制流、AAC 解析、平台适配、启动器、打包和回录分析，使用可控 I/O，不连接客户端或驱动声卡。
 
+中文介绍站位于 `site/`，无需构建或安装依赖。用 `python3 -m http.server 8000 --directory site` 本地预览；修改客户端支持范围或补丁版本时，同步页面正文和 JSON-LD。站点检查随 Python 测试一起运行，发布与搜索引擎提交见 [搜索收录说明](https://github.com/Xy2002/ncm-gapless/blob/main/docs/search-discovery.md)。
+
 连接已通过启动器启用的目标客户端后：
 
 ```powershell
