@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google-site-verification" content="6BdbUZDsanxlnXNK-8KiS_tPrmHRO--OR3dxUpgH83s">
+  <title>网易云音乐无缝播放补丁 Windows / Mac 安装指南 | NCM Gapless</title>
+  <meta name="description" content="NCM Gapless 是网易云音乐桌面端的实验性无缝播放补丁。了解 Windows 和 Mac 的适用客户端版本、安装步骤与常见问题，提前准备下一首，减少专辑连续播放时的切歌间隔。">
+  <link rel="canonical" href="https://xy2002.github.io/ncm-gapless/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#f4f1e9">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:site_name" content="NCM Gapless">
+  <meta property="og:title" content="NCM Gapless · 网易云音乐无缝播放补丁">
+  <meta property="og:description" content="为连续专辑播放准备下一首。查看 Windows / Mac 安装方法、适用版本与使用限制。">
+  <meta property="og:url" content="https://xy2002.github.io/ncm-gapless/">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "NCM Gapless",
+    "description": "NCM Gapless 是网易云音乐桌面端的实验性无缝播放补丁。了解 Windows 和 Mac 的适用客户端版本、安装步骤与常见问题，提前准备下一首，减少专辑连续播放时的切歌间隔。",
+    "url": "https://xy2002.github.io/ncm-gapless/",
+    "sameAs": "https://github.com/Xy2002/ncm-gapless",
+    "downloadUrl": "https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip",
+    "softwareVersion": "0.3.1-experimental",
+    "operatingSystem": ["Windows x64", "macOS Apple Silicon"],
+    "applicationCategory": "MultimediaApplication",
+    "inLanguage": "zh-CN"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="header">
+    <a class="wordmark" href="#">NCM<span> / </span>Gapless</a>
+    <nav aria-label="主导航">
+      <a href="#install">安装使用</a>
+      <a href="#faq">常见问题</a>
+      <a href="https://github.com/Xy2002/ncm-gapless">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="intro-title">
+      <div class="hero-inner">
+        <p class="eyebrow">给连续专辑，留一段连续的声音。</p>
+        <p class="product-name">NCM Gapless</p>
+        <h1 id="intro-title">网易云音乐无缝播放补丁</h1>
+        <p class="intro">提前准备下一首，在同一个音频时钟上接续播放。<br class="desktop-break">保留曲目本身的静音，不使用交叉淡化。</p>
+        <div class="actions">
+          <a class="button" href="https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip">下载源码 ZIP <span aria-hidden="true">↓</span></a>
+          <a class="text-link" href="#compatibility">先确认适用版本 <span aria-hidden="true">↘</span></a>
+        </div>
+        <p class="release">0.3.1-experimental · 实验版本 · Windows / macOS</p>
+        <figure class="continuity">
+          <svg viewBox="0 0 960 132" role="img" aria-labelledby="wave-title wave-description">
+            <title id="wave-title">两首曲目在同一条时间线上衔接的示意图</title>
+            <desc id="wave-description">当前曲目结束时，已准备好的下一首接续。示意图不代表实际音频测量结果。</desc>
+            <path class="wave-guide" d="M0 66H960 M480 8V124"/>
+            <path class="wave" d="M0 66h24l6-10 6 20 6-10h18l6-22 6 44 6-22h18l6-38 6 76 6-38h18l6-18 6 36 6-18h18l6-44 6 88 6-44h18l6-26 6 52 6-26h18l6-48 6 96 6-48h18l6-32 6 64 6-32h18l6-18 6 36 6-18h18l6-42 6 84 6-42h18l6-24 6 48 6-24h18l6-38 6 76 6-38h18l6-20 6 40 6-20h18l6-46 6 92 6-46h18l6-28 6 56 6-28h18l6-40 6 80 6-40h18l6-22 6 44 6-22h18l6-44 6 88 6-44h18l6-30 6 60 6-30h18l6-18 6 36 6-18h18l6-36 6 72 6-36h18l6-24 6 48 6-24h18l6-42 6 84 6-42h18l6-20 6 40 6-20h18l6-12 6 24 6-12h36"/>
+          </svg>
+          <figcaption><span>当前曲目</span><span>衔接示意 / 下一首</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section explanation" aria-labelledby="how-title">
+      <p class="section-label">01 / 连续播放</p>
+      <div>
+        <h2 id="how-title">网易云切歌有停顿，可以怎样改善？</h2>
+        <p>现场专辑、古典乐和连续混音常把一段声音分成多首曲目。NCM Gapless 提前下载并解码下一首，将它安排在当前曲目的结尾播放，减少等待换曲后才加载造成的间隔。</p>
+        <p>声音由客户端中的 Web Audio 引擎输出，官方界面继续负责选曲和队列。音源必须来自当前账号经官方流程取得的授权播放信息。</p>
+        <p class="note">连续效果取决于音源本身是否连续，以及下一首能否及时准备好。补丁不会删除原有静音，也不提供会员或版权限制绕过。</p>
+        <a class="text-link" href="https://github.com/Xy2002/ncm-gapless#工作原理">阅读完整工作原理 <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="section" id="compatibility" aria-labelledby="compatibility-title">
+      <p class="section-label">02 / 适用版本</p>
+      <div>
+        <h2 id="compatibility-title">先确认你的网易云音乐客户端</h2>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">NCM Gapless 支持的平台、网易云客户端版本和运行要求</caption>
+            <thead><tr><th scope="col">平台</th><th scope="col">网易云版本</th><th scope="col">运行要求</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Windows x64</th><td><code>3.1.42.205594</code></td><td>PowerShell 5.1 或 7</td></tr>
+              <tr><th scope="row">macOS Apple Silicon</th><td><code>3.1.12.3444</code></td><td>Python 3，首次运行需联网</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">未知客户端版本会拒绝启用。Intel Mac、其他系统及客户端版本尚未验证；手机端和网页版不在本项目适配范围内。</p>
+        <a class="text-link" href="https://github.com/Xy2002/ncm-gapless/blob/main/compatibility.json">查看兼容性记录 <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="section" id="install" aria-labelledby="install-title">
+      <p class="section-label">03 / 安装使用</p>
+      <div>
+        <h2 id="install-title">Windows / Mac 如何启用无缝播放？</h2>
+        <p>下载源码 ZIP 后完整解压，保留目录结构。运行前先完全退出网易云音乐。</p>
+        <div class="platforms">
+          <div>
+            <h3>Windows</h3>
+            <ol>
+              <li>双击 <code>Start-NcmGapless.cmd</code> 启动并启用补丁。</li>
+              <li>在网易云中重新选择一首歌曲开始播放。</li>
+              <li>双击 <code>Get-NcmGaplessStatus.cmd</code> 查看状态。</li>
+            </ol>
+            <p>无需安装 Python、Node.js，也无需管理员权限。</p>
+          </div>
+          <div>
+            <h3>macOS</h3>
+            <ol>
+              <li>安装 Python 3，双击 <code>Start-NcmGapless.command</code>。</li>
+              <li>首次运行会在解压目录创建 <code>.venv</code>，联网安装依赖。</li>
+              <li>重新选曲，用 <code>Get-NcmGaplessStatus.command</code> 查看状态。</li>
+            </ol>
+            <p>依赖只安装到项目目录，后续启动复用该环境。</p>
+          </div>
+        </div>
+        <p class="note">当前下载入口为仓库源码 ZIP。非标准安装路径和启动错误的处理方式见下方使用说明。</p>
+        <div class="document-links">
+          <a class="text-link" href="https://github.com/Xy2002/ncm-gapless#开始使用">完整使用说明 <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="https://github.com/Xy2002/ncm-gapless/blob/main/docs/macos.md">Mac 安装与错误处理 <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <p class="section-label">04 / 常见问题</p>
+      <div class="faq">
+        <h2 id="faq-title">使用前，你可能还想知道</h2>
+        <details open>
+          <summary>无缝播放和交叉淡化有什么区别？</summary>
+          <p>交叉淡化会让前后两首的声音重叠并渐变。NCM Gapless 按音频时钟接续曲目，不混合两首声音，不删除歌曲自身的静音，适合尝试连续专辑播放。</p>
+        </details>
+        <details open>
+          <summary>为什么第一首需要等待，切歌仍然可能停顿？</summary>
+          <p>每首歌都需要完整下载并解码。网络速度、音轨大小和内存预算会影响准备时间。下一首未及时准备好时，无法保证连续衔接；曲目本身包含的静音也会保留。</p>
+        </details>
+        <details open>
+          <summary>支持 FLAC、MP3 和本地缓存吗？</summary>
+          <p>支持授权播放信息中的 MP3、FLAC、WAV 和部分 AAC/M4A。无法可靠确定时长的音源、加密本地缓存、试听和权限受限内容会继续走官方播放路径。</p>
+        </details>
+        <details open>
+          <summary>怎样关闭补丁，会修改客户端文件吗？</summary>
+          <p>Windows 运行 <code>Stop-NcmGapless.cmd</code>，Mac 运行 <code>Stop-NcmGapless.command</code>，即可停用并恢复官方播放。补丁只驻留内存，不修改安装文件。重启网易云会清除补丁，下次需重新启用。</p>
+        </details>
+        <details open>
+          <summary>支持所有网易云版本、蓝牙和官方音效吗？</summary>
+          <p>仅适配上表中的客户端版本。蓝牙、空间音频、独占设备、系统媒体控制和复杂队列操作仍需验证，表现可能与官方播放器不同。当前为实验版本，请先确认自己的使用场景。</p>
+        </details>
+        <details open>
+          <summary>遇到问题应该提供什么信息？</summary>
+          <p>通过 <a href="https://github.com/Xy2002/ncm-gapless/issues">GitHub Issues 反馈</a>，附上系统、客户端与补丁版本、重现步骤和脱敏状态。不要上传 Cookie、令牌、签名音源地址或歌曲文件。</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="start-title">
+      <p class="section-label">从一张连续专辑开始</p>
+      <h2 id="start-title">准备好下一首。</h2>
+      <a class="button" href="https://github.com/Xy2002/ncm-gapless">查看项目与使用说明 <span aria-hidden="true">↗</span></a>
+    </section>
+  </main>
+  <footer>
+    <span>NCM Gapless · 与网易云音乐没有官方关联，许可证尚待确定。</span>
+    <a href="sitemap.xml">站点地图</a>
+  </footer>
+</body>
+</html>
