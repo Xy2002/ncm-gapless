@@ -7,20 +7,50 @@ Use only against a client you own. websocket-client is a development dependency.
 import argparse
 import json
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
-import websocket
+PAGE_URLS = ("orpheus://orpheus/pub/app.html", "orpheus://orpheus/app.html")
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, url):
+        return None
+
+
+def get_page(port: int):
+    if not 1 <= port <= 65535:
+        raise RuntimeError("NCM_PORT_INVALID")
+    opener = build_opener(ProxyHandler({}), NoRedirect())
+    with opener.open(f"http://127.0.0.1:{port}/json/list", timeout=2) as response:
+        pages = json.loads(response.read(1024 * 1024))
+    if not isinstance(pages, list) or any(not isinstance(page, dict) for page in pages):
+        raise RuntimeError("NCM_PAGE_LIST_INVALID")
+    matches = [p for p in pages if p.get("type") == "page" and p.get("url") in PAGE_URLS]
+    if len(matches) != 1:
+        raise RuntimeError("NCM_PAGE_NOT_UNIQUE")
+    endpoint = matches[0].get("webSocketDebuggerUrl", "")
+    if not isinstance(endpoint, str):
+        raise RuntimeError("NCM_ENDPOINT_NOT_LOOPBACK")
+    socket = urlsplit(endpoint)
+    if (socket.scheme != "ws" or socket.hostname != "127.0.0.1" or socket.port != port
+            or socket.username or socket.password or socket.fragment
+            or not socket.path.startswith("/devtools/page/")):
+        raise RuntimeError("NCM_ENDPOINT_NOT_LOOPBACK")
+    return endpoint
 
 
 def evaluate(port: int, expression: str, *, user_gesture: bool = False):
-    with urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5) as response:
-        pages = json.load(response)
-    matches = [p for p in pages if p.get("url") == "orpheus://orpheus/pub/app.html"]
-    if len(matches) != 1:
-        raise RuntimeError("Expected exactly one NetEase main page")
-    connection = websocket.create_connection(
-        matches[0]["webSocketDebuggerUrl"], timeout=20, suppress_origin=True
-    )
+    import websocket
+
+    endpoint = get_page(port)
+    try:
+        connection = websocket.create_connection(
+            endpoint, timeout=20, suppress_origin=True, http_no_proxy=["127.0.0.1"],
+            redirect_limit=0,
+        )
+    except websocket.WebSocketException:
+        raise RuntimeError("NCM_CDP_CONNECTION_FAILED") from None
     try:
         connection.send(json.dumps({
             "id": 1, "method": "Runtime.evaluate", "params": {
@@ -33,6 +63,8 @@ def evaluate(port: int, expression: str, *, user_gesture: bool = False):
             result = json.loads(connection.recv())
             if result.get("id") == 1:
                 return result
+    except websocket.WebSocketException:
+        raise RuntimeError("NCM_CDP_CONNECTION_FAILED") from None
     finally:
         connection.close()
 

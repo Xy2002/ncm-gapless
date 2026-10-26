@@ -1,7 +1,7 @@
 {
   "status": "experimental-client-patch",
   "productionPatchAvailable": false,
-  "target": "official-netease-windows-desktop-client",
+  "target": "official-netease-desktop-clients",
   "observed": {
     "windowsBuild": "26200",
     "windowsArchitecture": "x64",
@@ -42,7 +42,55 @@
     "native-effects-spatial-audio",
     "smtc-and-bluetooth"
   ],
-  "version": "0.2.2-experimental",
+  "version": "0.3.1-experimental",
   "experimentalPatchAvailable": true,
-  "requiresLauncherAfterClientRestart": true
+  "requiresLauncherAfterClientRestart": true,
+  "verifiedCapabilitiesPlatform": "windows",
+  "verifiedCapabilitiesVersion": "0.2.1-experimental",
+  "macos": {
+    "status": "experimental",
+    "observed": {
+      "macosVersion": "27.0.1",
+      "macosBuild": "26A434",
+      "hostArchitecture": "arm64",
+      "clientVersion": "3.1.12.3444",
+      "clientBinaryArchitectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "chromiumVersion": "116.0.5845.190",
+      "userAgentChromeVersion": "120.0.0.0",
+      "pythonVersion": "3.13.2"
+    },
+    "runtimeRequirements": [
+      "python3",
+      "websocket-client==1.9.0"
+    ],
+    "verifiedCapabilities": [
+      "bundle-discovery-and-version-guard",
+      "cef-loopback-debug-interface",
+      "sdk-and-legacy-call-adapter-interception",
+      "authorized-flac-to-web-audio",
+      "official-next-track-prefetch-and-decode",
+      "offline-pcm-continuity-at-44100-48000-96000",
+      "generated-flac-mp3-aac-decoding",
+      "official-pause-resume-and-paused-seek",
+      "natural-transition-scheduling-and-official-handoff",
+      "disable-restores-both-bridges-and-native-position",
+      "cold-launch-with-port-conflict",
+      "repeat-install-and-cross-directory-launch",
+      "disable-preserves-official-pause-and-native-clock-freeze"
+    ],
+    "unverified": [
+      "output-device-loopback",
+      "subjective-listening-acceptance",
+      "intel-runtime",
+      "other-client-and-macos-versions",
+      "native-effects-and-system-media-controls",
+      "bluetooth"
+    ],
+    "evidence": "docs/evidence/macos-validation.json",
+    "verifiedCapabilitiesVersion": "0.3.0-experimental",
+    "firstRunEvidence": "docs/evidence/macos-first-run-v0.3.1.json"
+  }
 }
