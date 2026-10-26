@@ -9,8 +9,8 @@ Windows 补丁运行需要已适配客户端与 Windows PowerShell；macOS 运�
 ```powershell
 python -m pip install -r requirements-dev.txt
 node --test tests/controller.test.cjs tests/aac-timing.test.cjs
-python -m unittest discover -s tests -p "test_*.py" -v
 node --test tests/client-adapter.test.js tests/verify-disable.test.js
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 上述测试检查控制流、AAC 解析、平台适配、启动器、打包和回录分析，使用可控 I/O，不连接客户端或驱动声卡。
