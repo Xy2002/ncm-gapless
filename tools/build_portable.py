@@ -19,6 +19,7 @@ FILES = [
     "docs/macos.md", "docs/evidence/macos-validation.json",
     "docs/evidence/macos-first-run-v0.3.1.json",
     "docs/evidence/macos-automation-v0.4.0.json",
+    "docs/evidence/macos-setup-v0.4.0.json",
 ]
 PLATFORM_FILES = {
     "windows": ["Start-NcmGapless.cmd", "Start-NcmGapless.ps1", "Stop-NcmGapless.cmd", "Stop-NcmGapless.ps1",

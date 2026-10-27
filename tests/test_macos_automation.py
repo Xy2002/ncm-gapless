@@ -11,12 +11,13 @@ from tempfile import TemporaryDirectory
 import threading
 import time
 import unittest
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import macos_launcher as launcher
 
 
+@unittest.skipIf(sys.platform == "win32", "macOS automation uses POSIX file locks")
 class AutomationTests(unittest.TestCase):
     def setUp(self):
         self.directory = TemporaryDirectory(prefix="ncm automation ")
@@ -209,6 +210,111 @@ class AutomationTests(unittest.TestCase):
                         launcher.uninstall_patch(49321)
                 else:
                     self.assertFalse(launcher.uninstall_patch(49321)["installed"])
+
+    def test_setup_verifies_real_launch_after_releasing_operation_lock(self):
+        settings = self.enable()
+        def launched(*args, **kwargs):
+            with launcher.operation(wait=False) as acquired:
+                self.assertTrue(acquired)
+                launcher.atomic_write(self.folder / "last-run.json", json.dumps({
+                    "token": settings["token"], "installed": True, "error": None,
+                }).encode())
+        with patch.object(launcher, "running_commands", return_value=[self.command]), patch.object(launcher, "quit_client") as quit_client, patch.object(launcher.subprocess, "run", side_effect=launched) as run, patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}):
+            self.assertEqual(launcher.verify_automatic(settings, self.app), {"port": 49321, "installed": True})
+            quit_client.assert_called_once_with(self.app, check=ANY)
+            run.assert_called_once_with(["/usr/bin/open", "-a", str(self.app)], check=True, capture_output=True, timeout=10)
+
+    def test_setup_rejects_a_stale_success_record(self):
+        settings = self.enable()
+        launcher.atomic_write(self.folder / "last-run.json", json.dumps({"token": settings["token"], "installed": True}).encode())
+        with patch.object(launcher, "running_commands", return_value=[]), patch.object(launcher.subprocess, "run"), patch.object(launcher.time, "monotonic", side_effect=[0, 1, 46]), patch.object(launcher.time, "sleep"), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}):
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_NOT_READY"):
+                launcher.verify_automatic(settings, self.app)
+
+    def test_existing_setup_skips_questions_and_reports_the_new_port(self):
+        self.enable()
+        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True, "port": 9222}), patch.object(launcher, "verify_automatic", return_value={"port": 49321, "installed": True}), patch.object(launcher, "prompt_configuration") as prompt:
+            report = launcher.setup_automatic(self.app)
+            self.assertTrue(report["setupVerified"])
+            self.assertEqual(report["port"], 49321)
+            prompt.assert_not_called()
+
+    def test_enable_failure_reverts_memory_installation(self):
+        with patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "prepare_shortcut", side_effect=RuntimeError("NCM_AUTOMATION_IMPORT_FAILED")), patch.object(launcher, "uninstall_patch") as uninstall:
+            with self.assertRaisesRegex(RuntimeError, "NCM_AUTOMATION_IMPORT_FAILED"):
+                launcher.enable_automatic(self.app)
+            uninstall.assert_called_once_with(49321)
+        self.assertIsNone(launcher.automation_settings())
+
+    def test_fresh_setup_waits_for_import_then_verifies(self):
+        self.enable()
+        terminal = Mock()
+        terminal.isatty.return_value = True
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value={"shortcutImported": False}), patch.object(launcher, "shortcut_installed", side_effect=[False, True]), patch.object(launcher.time, "sleep"), patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "verify_automatic", return_value={"installed": True}) as verify:
+            self.assertTrue(launcher.setup_automatic(self.app)["setupVerified"])
+            prompt.assert_called_once()
+            verify.assert_called_once()
+
+    def test_setup_cancellation_rolls_back_without_verifying(self):
+        settings = self.enable()
+        terminal = Mock()
+        terminal.isatty.return_value = True
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value={"shortcutImported": False}), patch.object(launcher, "shortcut_installed", return_value=True), patch.object(launcher, "prompt_configuration", side_effect=RuntimeError("NCM_SETUP_CANCELLED")), patch.object(launcher, "verify_automatic") as verify, patch.object(launcher, "rollback_setup") as rollback:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_CANCELLED"):
+                launcher.setup_automatic(self.app)
+            verify.assert_not_called()
+            rollback.assert_called_once_with(settings)
+
+    def test_setup_keyboard_interrupt_also_rolls_back(self):
+        settings = self.enable()
+        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True}), patch.object(launcher, "verify_automatic", side_effect=KeyboardInterrupt), patch.object(launcher, "rollback_setup") as rollback:
+            with self.assertRaises(KeyboardInterrupt):
+                launcher.setup_automatic(self.app)
+            rollback.assert_called_once_with(settings)
+
+    def test_setup_retries_only_after_confirmation_and_stops_after_three_attempts(self):
+        self.enable()
+        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True}), patch.object(launcher, "verify_automatic", side_effect=RuntimeError("NCM_SETUP_NOT_READY")) as verify, patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "rollback_setup") as rollback:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_NOT_READY"):
+                launcher.setup_automatic(self.app)
+            self.assertEqual(verify.call_count, 3)
+            self.assertEqual(prompt.call_count, 2)
+            rollback.assert_called_once()
+
+    def test_setup_rollback_uninstalls_only_its_own_session(self):
+        settings = self.enable()
+        (self.folder / "on-open.command").touch()
+        with patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "uninstall_patch") as uninstall:
+            launcher.rollback_setup(settings)
+            uninstall.assert_called_once_with(49321)
+        self.assertIsNone(launcher.automation_settings())
+        self.assertFalse((self.folder / "on-open.command").exists())
+
+    def test_setup_rollback_preserves_a_newer_enable_request(self):
+        settings = self.enable()
+        newer = {**settings, "token": "b" * 32}
+        launcher.atomic_write(self.folder / "enabled.json", json.dumps(newer).encode())
+        with patch.object(launcher, "uninstall_patch") as uninstall:
+            launcher.rollback_setup(settings)
+            uninstall.assert_not_called()
+        self.assertEqual(launcher.automation_settings(), newer)
+
+    def test_setup_confirmation_can_cancel_without_changing_system_preferences(self):
+        terminal = Mock()
+        terminal.isatty.return_value = True
+        terminal.readline.return_value = "q\n"
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher.select, "select", return_value=([terminal], [], [])), patch.object(launcher.subprocess, "run") as run:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_CANCELLED"):
+                launcher.prompt_configuration()
+            run.assert_called_once_with(["/usr/bin/shortcuts", "view", launcher.SHORTCUT_NAME], check=True, capture_output=True, timeout=15)
+
+    def test_setup_without_a_terminal_does_not_attempt_ui_control(self):
+        terminal = Mock()
+        terminal.isatty.return_value = False
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher.subprocess, "run") as run:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_REQUIRES_TERMINAL"):
+                launcher.prompt_configuration()
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

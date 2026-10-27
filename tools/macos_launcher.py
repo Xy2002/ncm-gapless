@@ -8,6 +8,7 @@ from pathlib import Path
 import plistlib
 import platform
 import re
+import select
 import shlex
 import socket
 import subprocess
@@ -339,6 +340,7 @@ def enable_automatic(app):
         atomic_write(AUTOMATION_DIR / "on-open.command", entry.encode(), mode=0o700)
         atomic_write(AUTOMATION_DIR / "enabled.json", json.dumps(settings).encode())
         check = lambda: check_automation(settings)
+        port = None
         try:
             port = find_port(launch=True, client_path=app, restart=True, check=check)
             report = value(port, "window.NcmGapless?.status?.() || ({installed:false})")
@@ -350,6 +352,11 @@ def enable_automatic(app):
             if automation_settings() == settings:
                 (AUTOMATION_DIR / "enabled.json").unlink(missing_ok=True)
                 (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
+                if port is not None:
+                    try:
+                        uninstall_patch(port)
+                    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+                        print("如需恢复官方播放，请运行 Stop-NcmGapless.command。", file=sys.stderr)
             raise
     return {"port": port, **report, "automaticEnabled": True, "shortcutImported": imported,
             "shortcutImportRequired": not imported}
@@ -392,20 +399,124 @@ def on_open():
                 }).encode())
 
 
+def prompt_configuration():
+    if not sys.stdin.isatty():
+        raise RuntimeError("NCM_SETUP_REQUIRES_TERMINAL")
+    subprocess.run(["/usr/bin/shortcuts", "view", SHORTCUT_NAME],
+                   check=True, capture_output=True, timeout=15)
+    print("\n首次配置需要在系统界面确认：\n"
+          "  1. 展开顶部的网易云 App 条件，打开“自动化”。\n"
+          "  2. 如脚本操作已停用，点“打开偏好设置”，允许脚本运行。\n"
+          "完成后回到此窗口按回车验证；输入 q 取消。", file=sys.stderr, flush=True)
+    ready, _, _ = select.select([sys.stdin], [], [], 300)
+    if not ready:
+        raise RuntimeError("NCM_SETUP_CANCELLED")
+    answer = sys.stdin.readline()
+    if not answer or answer.strip().lower() in ("q", "quit", "取消"):
+        raise RuntimeError("NCM_SETUP_CANCELLED")
+
+
+def verify_automatic(settings, app):
+    last_file = AUTOMATION_DIR / "last-run.json"
+    with operation():
+        check_automation(settings)
+        executable = str(app / "Contents/MacOS/NeteaseMusic")
+        if any(command == executable or command.startswith(executable + " ") for command in running_commands()):
+            quit_client(app, check=lambda: check_automation(settings))
+        previous = last_file.stat().st_mtime_ns if last_file.exists() else None
+    check_automation(settings)
+    subprocess.run(["/usr/bin/open", "-a", str(app)], check=True, capture_output=True, timeout=10)
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        check_automation(settings)
+        try:
+            changed = last_file.stat().st_mtime_ns != previous
+            last = json.loads(last_file.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError, UnicodeError):
+            last, changed = {}, False
+        if changed and isinstance(last, dict) and last.get("token") == settings["token"]:
+            error = last.get("error")
+            if error:
+                raise RuntimeError(error if isinstance(error, str) and re.fullmatch(r"[A-Z][A-Z0-9_]+", error)
+                                   else "NCM_OPERATION_FAILED")
+            if last.get("installed"):
+                port = find_port(client_path=app)
+                report = value(port, "window.NcmGapless?.status?.() || ({installed:false})")
+                if report.get("installed"):
+                    return {"port": port, **report}
+        time.sleep(.25)
+    raise RuntimeError("NCM_SETUP_NOT_READY")
+
+
+def rollback_setup(settings):
+    with operation():
+        if automation_settings() != settings:
+            return
+        (AUTOMATION_DIR / "enabled.json").unlink(missing_ok=True)
+        (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
+        try:
+            port = find_port(client_path=settings["clientPath"])
+        except RuntimeError as error:
+            if str(error) not in ("NCM_NOT_RUNNING", "NCM_EXIT_AND_RESTART_WITH_LAUNCHER"):
+                raise
+        else:
+            uninstall_patch(port)
+
+
+def setup_automatic(app):
+    report = enable_automatic(app)
+    settings = automation_settings()
+    if not settings:
+        raise RuntimeError("NCM_AUTO_ENABLE_CANCELLED")
+    try:
+        if not report["shortcutImported"]:
+            if not sys.stdin.isatty():
+                raise RuntimeError("NCM_SETUP_REQUIRES_TERMINAL")
+            print("等待添加“NCM Gapless 自动启用”，最长等待三分钟，Ctrl+C 可取消。", file=sys.stderr, flush=True)
+            deadline = time.monotonic() + 180
+            while not shortcut_installed():
+                check_automation(settings)
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("NCM_SETUP_CANCELLED")
+                time.sleep(1)
+            prompt_configuration()
+        for attempt in range(3):
+            print("正在验证普通重开后的自动加载，客户端会正常重开。", file=sys.stderr, flush=True)
+            try:
+                report = verify_automatic(settings, app)
+                break
+            except RuntimeError as error:
+                if str(error) != "NCM_SETUP_NOT_READY" or attempt == 2:
+                    raise
+                print("自动加载尚未生效，请检查系统配置。", file=sys.stderr)
+                prompt_configuration()
+        check_automation(settings)
+    except BaseException:
+        try:
+            rollback_setup(settings)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            print("初始化中止；如需恢复官方播放，请运行 Stop-NcmGapless.command。", file=sys.stderr)
+        raise
+    print("配置完成。以后直接打开网易云即可，直到运行停止脚本。", file=sys.stderr)
+    return {**report, "automaticEnabled": True, "shortcutImported": True,
+            "shortcutImportRequired": False, "setupVerified": True}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enable", "install", "status", "disable", "on-open"))
+    parser.add_argument("action", choices=("setup", "enable", "install", "status", "disable", "on-open"))
     parser.add_argument("--client-path", type=Path, help="Path to NeteaseMusic.app")
     arguments = parser.parse_args()
     if sys.platform != "darwin":
         raise RuntimeError("NCM_MACOS_REQUIRED")
     if arguments.action == "on-open":
         report = on_open()
-    elif arguments.action == "enable":
+    elif arguments.action in ("enable", "setup"):
         if int((platform.mac_ver()[0] or "0").split(".")[0]) < 27:
             raise RuntimeError("NCM_AUTOMATION_REQUIRES_MACOS_27")
         ensure_runtime()
-        report = enable_automatic(find_client(arguments.client_path))
+        app = find_client(arguments.client_path)
+        report = setup_automatic(app) if arguments.action == "setup" else enable_automatic(app)
     else:
         settings = None
         if arguments.action == "disable":
@@ -443,6 +554,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        print("NCM_OPERATION_CANCELLED", file=sys.stderr)
+        raise SystemExit(130)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         # Native/CDP errors can contain private paths or request data.
         message = str(error)

@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-27",
+  "kind": "guided-initialization-acceptance",
+  "version": "0.4.0-experimental",
+  "entry": "Start-NcmGapless.command",
+  "macosVersion": "27.0.1",
+  "hostArchitecture": "arm64",
+  "needsPreinstalledPython3": true,
+  "nativeConfirmationsRequired": [
+    "add-shortcut",
+    "enable-app-automation",
+    "allow-running-scripts"
+  ],
+  "installerChangesGlobalScriptPermission": false,
+  "additionalAccessibilityPermissionRequired": false,
+  "realMac": {
+    "existingSystemConfiguration": true,
+    "startReturnedSetupVerified": true,
+    "automaticInstalled": true,
+    "automaticEnabled": true,
+    "lastAutomaticError": null,
+    "helperExited": true,
+    "vendorSignatureValid": true,
+    "originalExecutableUnchanged": true
+  },
+  "regressionChecks": {
+    "pythonPassed": 51,
+    "freshImportAndUserConfirmationMocked": true,
+    "staleSuccessRejected": true,
+    "cancellationRollbackChecked": true,
+    "newerSessionPreservedDuringRollback": true
+  },
+  "secondMacTested": false,
+  "audioOutputRetested": false,
+  "directPrivateShortcutsDatabaseWrites": false
+}

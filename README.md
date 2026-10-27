@@ -82,10 +82,9 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ### macOS
 
-1. 安装好 Python 3 后，双击 `Start-NcmGapless.command`。首次运行会创建 `.venv` 并安装依赖。
-2. 首次配置时，导入“NCM Gapless 自动启用”，展开其中的网易云 App 条件，打开“自动化”；在快捷指令的“设置 → 高级”中允许脚本操作。
-3. 首次启用后在网易云中重新选曲，双击 `Get-NcmGaplessStatus.command` 查看状态。
-4. 此后直接从原图标打开网易云，退出重开后也会自动启用，直到执行停止脚本。普通启动可能出现一次自动退出和重开。
+1. 安装好 Python 3 后，双击 `Start-NcmGapless.command` 进入初始化向导。依赖、客户端发现和快捷指令生成由脚本处理。
+2. 首次按向导在系统界面添加快捷指令、打开网易云自动化并允许脚本运行，回到终端按回车。脚本会实际重开客户端自检，通过后显示“配置完成”。
+3. 首次启用后重新选曲。此后直接从原图标打开网易云，退出重开也会自动启用，直到执行停止脚本；状态可用 `Get-NcmGaplessStatus.command` 查看。
 
 也可以在解压目录运行：
 
@@ -93,7 +92,7 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 ./Start-NcmGapless.command
 ```
 
-自动启用需要 macOS 27。更早系统的手动方式、非标准路径和错误处理见 [macOS 使用说明](docs/macos.md)。依赖安装使用程序目录的 Python 环境。
+自动启用需要 macOS 27。首次系统许可需要本人确认，初始化和普通启动都可能正常重开客户端。更早系统的手动方式、非标准路径和错误处理见 [macOS 使用说明](docs/macos.md)。
 
 ## 状态与停用
 
