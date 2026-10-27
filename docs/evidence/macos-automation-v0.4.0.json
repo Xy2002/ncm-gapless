@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-27",
+  "clientVersion": "3.1.12.3444",
+  "patchVersion": "0.4.0-experimental",
+  "shortcutsGuiClosed": true,
+  "withGuiClosed": {
+    "installed": true,
+    "version": "0.4.0-experimental",
+    "errors": 0,
+    "helperExited": true
+  },
+  "stop": {
+    "automaticEnabled": false,
+    "installed": false,
+    "entryRemoved": true
+  },
+  "stopWhileClosed": true,
+  "ordinaryLaunchAfterStop": {
+    "automaticInjection": false,
+    "debugArgumentsAdded": false,
+    "helperRunning": false
+  },
+  "reenableWithoutImport": true,
+  "afterReenable": {
+    "installed": true,
+    "version": "0.4.0-experimental",
+    "errors": 0,
+    "helperExited": true
+  },
+  "vendorSignatureValid": true,
+  "originalExecutableUnchanged": true,
+  "noProjectResidentProcess": true,
+  "launchAgentInstalled": false,
+  "finalAutomaticEnabled": true,
+  "kind": "real-macos-shortcuts-lifecycle-acceptance",
+  "host": {
+    "macos": "27.0.1",
+    "architecture": "arm64"
+  },
+  "oneTimeSystemSetupCompleted": true,
+  "sourceTemplateImported": true,
+  "loopbackOnlyDebugArguments": true,
+  "clientBinarySha256": "e9c6b5468749ccad69ffe24e6395d6d29af9e2f7514a2bc9697e265b89b40374",
+  "audioOutputRetested": false,
+  "otherMacOSVersionsTested": false,
+  "intelTested": false,
+  "regressionChecks": {
+    "pythonPassed": 39,
+    "nodePassed": 38,
+    "installerOriginalExecutionComparisons": 4,
+    "portablePackagesChecked": [
+      "windows",
+      "macos"
+    ]
+  }
+}

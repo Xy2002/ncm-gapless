@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-27",
+  "kind": "persistence-research-followup",
+  "clientVersion": "3.1.12.3444",
+  "constraints": {
+    "preserveVendorSignature": true,
+    "noProjectResidentProcess": true,
+    "userRejectedResigning": true
+  },
+  "originalApplication": {
+    "strictDeepSignatureVerified": true,
+    "mainSha256": "e9c6b5468749ccad69ffe24e6395d6d29af9e2f7514a2bc9697e265b89b40374",
+    "modified": false
+  },
+  "userResourceDirectoryReadableAfterAuthorization": true,
+  "activePack": {
+    "relativeContainerPath": "Data/Documents/storage/Package/package.pack",
+    "bytes": 37229921,
+    "sha256": "a12d22c5c7c452e3da741143e093a15c72fab220481cc9ef604861b5d17b9705",
+    "entries": 1377,
+    "applicationChunk": "114fa7e",
+    "headerVersionMd5": "49b6f1aee0bdc68c8b0feed29fd57b6f",
+    "zipPayloadMd5": "3ea3189f1bd4b29ca1625578256987fc"
+  },
+  "headerVersionMd5MatchesClientVersion": true,
+  "nativePrototype": {
+    "separateApplicationCopyModified": true,
+    "copyResigned": true,
+    "originalApplicationModified": false,
+    "markerObserved": true,
+    "backgroundAgentUsed": false,
+    "runtimeGuardsConfirmed": true,
+    "patchInstalled": true,
+    "patchActive": false,
+    "audioPlaybackTested": false,
+    "deploymentAccepted": false
+  },
+  "fileEventCandidate": {
+    "dedicatedOrdinaryStartupMarkerFound": false,
+    "watchPathsRaceWarningInLocalManual": true,
+    "registered": false
+  },
+  "shortcutsCandidate": {
+    "macOSVersion": "27.0.1",
+    "appTriggerPresentInSystemUI": true,
+    "appleDocumentationListsAutomaticAppTrigger": true,
+    "scriptsCurrentlyAllowed": false,
+    "draftCreated": true,
+    "draftName": "NCM Gapless 自动启用（待配置）",
+    "projectTriggerCreated": false,
+    "projectAutomationEnabled": false,
+    "liveAutoInjectionTested": false,
+    "oneShotPrototypeChecksPassed": 9,
+    "mockClientAndCDPUsed": true,
+    "realFileLockOrderingChecked": true,
+    "existingInstallerExecutedForComparison": true
+  },
+  "backgroundAgentInstalled": false,
+  "backgroundAgentLoaded": false,
+  "accountOrAudioContentRead": false
+}

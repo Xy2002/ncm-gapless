@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3.1-experimental"
+VERSION = "0.4.0-experimental"
 FILES = [
     "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "compatibility.json",
     "src/client-adapter.js", "src/aac-timing.js", "src/gapless-engine.js", "src/netease-gapless.js", "src/gapless-core.js",
@@ -18,12 +18,13 @@ FILES = [
     "docs/evidence/review-fixes-v0.2.2.json",
     "docs/macos.md", "docs/evidence/macos-validation.json",
     "docs/evidence/macos-first-run-v0.3.1.json",
+    "docs/evidence/macos-automation-v0.4.0.json",
 ]
 PLATFORM_FILES = {
     "windows": ["Start-NcmGapless.cmd", "Start-NcmGapless.ps1", "Stop-NcmGapless.cmd", "Stop-NcmGapless.ps1",
                 "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1"],
     "macos": ["Start-NcmGapless.command", "Stop-NcmGapless.command", "Get-NcmGaplessStatus.command",
-              "tools/macos_launcher.py", "tools/cdp_probe.py", "requirements-macos.txt"],
+              "tools/macos_launcher.py", "tools/macos_automation.json", "tools/cdp_probe.py", "requirements-macos.txt"],
 }
 
 

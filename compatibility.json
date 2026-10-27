@@ -42,7 +42,7 @@
     "native-effects-spatial-audio",
     "smtc-and-bluetooth"
   ],
-  "version": "0.3.1-experimental",
+  "version": "0.4.0-experimental",
   "experimentalPatchAvailable": true,
   "requiresLauncherAfterClientRestart": true,
   "verifiedCapabilitiesPlatform": "windows",
@@ -91,6 +91,15 @@
     ],
     "evidence": "docs/evidence/macos-validation.json",
     "verifiedCapabilitiesVersion": "0.3.0-experimental",
-    "firstRunEvidence": "docs/evidence/macos-first-run-v0.3.1.json"
+    "firstRunEvidence": "docs/evidence/macos-first-run-v0.3.1.json",
+    "automaticEnable": {
+      "mode": "system-shortcuts-app-trigger",
+      "minimumMacosVersion": "27",
+      "oneTimeSystemSetupRequired": true,
+      "preservesVendorSignature": true,
+      "residentProjectProcessRequired": false,
+      "verifiedVersion": "0.4.0-experimental",
+      "evidence": "docs/evidence/macos-automation-v0.4.0.json"
+    }
   }
 }

@@ -68,7 +68,7 @@ class MacLauncherTests(unittest.TestCase):
         self.assertEqual(launcher.find_port(launch=True), 49321)
         run.assert_called_once_with(["/usr/bin/open", "-a", "/Applications/Music With Spaces.app", "--args",
                                     "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=49321"],
-                                   check=True, capture_output=True)
+                                   check=True, capture_output=True, timeout=10)
 
 
 class RuntimeTests(unittest.TestCase):
