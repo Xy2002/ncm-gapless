@@ -42,7 +42,7 @@
     "native-effects-spatial-audio",
     "smtc-and-bluetooth"
   ],
-  "version": "0.5.0-experimental",
+  "version": "0.6.0-experimental",
   "experimentalPatchAvailable": true,
   "requiresLauncherAfterClientRestart": true,
   "windowsStartupLoader": {
@@ -121,6 +121,41 @@
       "residentProjectProcessRequired": false,
       "verifiedVersion": "0.4.0-experimental",
       "evidence": "docs/evidence/macos-automation-v0.4.0.json"
+    },
+    "maintenance": {
+      "status": "implemented-not-published",
+      "version": "0.6.0-experimental",
+      "installEntry": "Start-NcmGapless.command",
+      "installationDirectory": "~/Library/Application Support/NcmGapless",
+      "sourceDirectoryRequiredAfterSetup": false,
+      "pythonInstallationRequiredAfterSetup": true,
+      "mode": "system-shortcuts-short-lived-startup-check",
+      "updateIntervalHours": 6,
+      "failedCheckRetryMinutes": 30,
+      "activationTiming": "verified updates are used on the next launch",
+      "clientIdentity": "Apple code signing anchor, bundle identifier and expected TeamIdentifier",
+      "clientCompatibility": "passive playback-contract checks on every injection, including known versions",
+      "newClientVersions": "detected playback contract; not real client upgrade or audio qualification",
+      "releaseSignature": "RSA PKCS1 v1.5 SHA256",
+      "immutableRuntimeDirectories": true,
+      "activationFailureRollback": "three different page instances; compatibility failures excluded",
+      "sameProcessPageReloadRecovery": false,
+      "residentProjectProcessRequired": false,
+      "preservesVendorSignature": true,
+      "updateChannel": "https://github.com/Xy2002/ncm-gapless/releases/download/macos-maintenance/macos-update.json",
+      "documentation": "docs/macos-maintenance.md",
+      "ciPublication": {
+        "status": "implemented-not-published",
+        "triggerTags": "macos-release-v*",
+        "secret": "NCM_MACOS_RELEASE_KEY",
+        "secretConfigured": false,
+        "published": false
+      },
+      "unverified": [
+        "real-client-upgrade",
+        "published-signed-update-channel",
+        "current-patch-audio-acceptance"
+      ]
     }
   },
   "windowsMaintenance": {

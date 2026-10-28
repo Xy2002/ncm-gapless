@@ -1,5 +1,6 @@
 """No client, account, network, or audio required."""
-from io import BytesIO
+from contextlib import redirect_stdout
+from io import BytesIO, StringIO
 import json
 from pathlib import Path
 import plistlib
@@ -15,7 +16,34 @@ import macos_launcher as launcher
 
 
 class MacLauncherTests(unittest.TestCase):
-    def test_discovery_checks_bundle_identity_and_version(self):
+    @unittest.skipIf(sys.platform == "win32", "Mac maintenance uses POSIX locks")
+    def test_stop_uses_latest_client_after_spawn_unless_user_selected_one(self):
+        import macos_maintenance as maintenance
+        import macos_updates as updates
+        old_app, new_app = Path("/Apps/Old Music.app"), Path("/Apps/New Music.app")
+        for explicit in (False, True):
+            with self.subTest(explicit=explicit), TemporaryDirectory() as directory:
+                base = Path(directory)
+                runtime = base / "versions" / ("a" * 64)
+                def enable(app):
+                    (base / "enabled.json").write_text(json.dumps({
+                        "root": str(base), "clientPath": str(app), "token": "1" * 32,
+                    }))
+                enable(old_app)
+                (base / "update-state.json").write_text("{}")
+                def run(command, **kwargs):
+                    enable(new_app)  # A new Start finished after the bootstrap released its lock.
+                    with patch.object(sys, "argv", command[2:]), redirect_stdout(StringIO()) as output:
+                        launcher.main()
+                    return subprocess.CompletedProcess(command, 0, output.getvalue(), "")
+                with patch.object(maintenance, "BASE", base), patch.object(launcher, "AUTOMATION_DIR", base), patch.object(sys, "platform", "darwin"), patch.object(updates, "active_runtime", return_value=runtime), patch.object(maintenance.subprocess, "run", side_effect=run), patch.object(launcher, "find_port", return_value=49321) as find, patch.object(launcher, "ensure_runtime"), patch.object(launcher, "uninstall_patch", return_value={"installed": False}) as uninstall, redirect_stdout(StringIO()):
+                    self.assertEqual(maintenance.dispatch("disable", old_app if explicit else None), 0)
+                find.assert_called_once_with(launch=False, client_path=old_app if explicit else new_app)
+                uninstall.assert_called_once_with(49321)
+                self.assertFalse((base / "enabled.json").exists())
+
+    @patch.object(launcher, "verify_client_signature")
+    def test_discovery_checks_identity_and_accepts_new_signed_versions(self, verify):
         with TemporaryDirectory() as directory:
             app = Path(directory) / "Music With Spaces.app"
             (app / "Contents/MacOS").mkdir(parents=True)
@@ -25,7 +53,11 @@ class MacLauncherTests(unittest.TestCase):
             path = app / "Contents/Info.plist"
             path.write_bytes(plistlib.dumps(info))
             self.assertEqual(launcher.find_client(app), app.resolve())
+            verify.assert_called_once_with(app.resolve())
             info["CFBundleVersion"] = "9999"
+            path.write_bytes(plistlib.dumps(info))
+            self.assertEqual(launcher.find_client(app), app.resolve())
+            info["CFBundleVersion"] = "invalid"
             path.write_bytes(plistlib.dumps(info))
             with self.assertRaisesRegex(RuntimeError, "CLIENT_VERSION_UNVERIFIED"):
                 launcher.find_client(app)
@@ -33,6 +65,31 @@ class MacLauncherTests(unittest.TestCase):
             path.write_bytes(plistlib.dumps(info))
             with self.assertRaisesRegex(RuntimeError, "NCM_INSTALLATION_NOT_UNIQUE"):
                 launcher.find_client(app)
+
+    @patch.object(launcher.subprocess, "run")
+    def test_signature_verifies_apple_chain_and_signed_publisher(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, "", "TeamIdentifier=43B53CMF9D\n")
+        launcher.verify_client_signature(Path("/Applications/Music With Spaces.app"))
+        self.assertIn('anchor apple generic', run.call_args_list[0].args[0][3])
+        self.assertNotIn('subject.OU', run.call_args_list[0].args[0][3])
+        run.return_value = subprocess.CompletedProcess([], 0, "", "TeamIdentifier=OTHER\n")
+        with self.assertRaisesRegex(RuntimeError, "NCM_CLIENT_PUBLISHER_UNVERIFIED"):
+            launcher.verify_client_signature(Path("/Applications/Music.app"))
+        run.side_effect = subprocess.CalledProcessError(1, "codesign")
+        with self.assertRaisesRegex(RuntimeError, "NCM_CLIENT_SIGNATURE_INVALID"):
+            launcher.verify_client_signature(Path("/Applications/Music.app"))
+
+    def test_install_waits_for_contract_and_keeps_failure_before_injection(self):
+        with patch.object(launcher, "value", return_value={"ready": False, "error": "CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED"}) as evaluate, patch.object(launcher.time, "monotonic", side_effect=[0, 1, 31]), patch.object(launcher.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED"):
+                launcher.install_patch(49321)
+            self.assertEqual(evaluate.call_count, 1)
+            self.assertIn("startupReadiness(window)", evaluate.call_args.args[1])
+            self.assertNotIn("NcmGapless.install()", evaluate.call_args.args[1])
+        with patch.object(launcher, "value", side_effect=[{"ready": True}, {"installed": True}]) as evaluate:
+            self.assertTrue(launcher.install_patch(49321)["installed"])
+            self.assertEqual(evaluate.call_count, 2)
+            self.assertIn("NcmGapless.install()", evaluate.call_args.args[1])
 
     @patch.object(launcher.subprocess, "run")
     def test_process_discovery_keeps_spaces_and_ignores_helpers(self, run):

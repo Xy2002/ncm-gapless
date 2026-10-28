@@ -1,0 +1,46 @@
+name: macOS signed maintenance release
+on:
+  push:
+    tags: ['macos-release-v*']
+permissions:
+  contents: write
+concurrency:
+  group: macos-maintenance-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check maintenance, signing and portable packages
+        run: |
+          python -m unittest discover -s tests -p 'test_macos*.py'
+          python -m unittest discover -s tests -p 'test_build_*.py'
+          node --test tests/client-adapter.test.js tests/controller.test.cjs tests/aac-timing.test.cjs tests/verify-disable.test.js
+      - name: Sign fixed runtime payload
+        env:
+          NCM_MACOS_RELEASE_KEY: ${{ secrets.NCM_MACOS_RELEASE_KEY }}
+        run: |
+          if [ -z "$NCM_MACOS_RELEASE_KEY" ]; then
+            echo 'Configure NCM_MACOS_RELEASE_KEY with key-owner authorization before publishing.' >&2
+            exit 1
+          fi
+          sequence=$(date +%s)
+          version=$(python -c "import sys;sys.path.insert(0,'tools');from build_portable import VERSION;print(VERSION)")
+          python tools/build_macos_release.py --sequence "$sequence" --tag "$GITHUB_REF_NAME" --version "$version"
+          python tools/build_portable.py --platform macos --macos-maintenance
+      - name: Publish version, then channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/macos-maintenance/macos-payload.zip artifacts/macos-maintenance/macos-update.json artifacts/*-macos-maintenance.zip --prerelease --title "$GITHUB_REF_NAME" --notes 'Signed macOS maintenance payload. See docs/macos-maintenance.md for compatibility and recovery boundaries.'
+          if ! gh release view macos-maintenance; then
+            gh release create macos-maintenance --target "$GITHUB_SHA" --prerelease --title 'macOS maintenance channel' --notes 'Signed update index for macOS automatic maintenance.'
+          fi
+          gh release upload macos-maintenance artifacts/macos-maintenance/macos-update.json --clobber

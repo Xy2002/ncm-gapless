@@ -23,7 +23,7 @@ function fixture(platform) {
       },
     } };
   const state = { playing: { playId: 'fixture', curPlaying: {} }, playingList: {} };
-  const store = { getState: () => state, dispatch() {}, subscribe() {} };
+  const store = { getState: () => state, dispatch(action) { calls.push({ action }); }, subscribe() { calls.push({ subscribed: true }); } };
   const modules = { sdk: { exports: sdk }, functions: { exports: {
     async preload({ curPlayId, preloadIndex }) {
       await sdk.AudioPlayer.setPreloadInfoResult({ params: { curPlayId, preloadIndex }, code: 1, info: { musicurl: 'fixture' } });
@@ -38,9 +38,17 @@ function fixture(platform) {
     document: { getElementById: () => ({ _reactRootContainer: { _internalRoot: { current: { memoizedProps: { store } } } } }) },
     legacyNativeCmder: { _envAdapter: legacy },
   };
-  if (platform === 'macos') target.ncmChannelOSX = { postMessage() {} };
+  if (platform === 'macos') {
+    target.ncmChannelOSX = { postMessage() { calls.push({ postMessage: true }); } };
+    target.AudioContext = function () { calls.push({ audioContext: true }); };
+    target.fetch = async () => { calls.push({ fetch: true }); };
+    target.AbortController = AbortController;
+    sdk.AudioPlayer.play = async () => { calls.push({ play: true }); };
+    sdk.Bridge.call = async () => { calls.push({ bridgeCall: true }); };
+    state.playingList.curPlayingList = [];
+  }
   else target.channel = { call: primary.callAdapter };
-  return { target, sdk, primary, legacy, calls, store };
+  return { target, sdk, primary, legacy, calls, store, states: modules.functions.exports.states };
 }
 
 for (const documentState of ['loading', 'interactive', 'complete']) {
@@ -138,14 +146,74 @@ for (const platform of ['windows', 'macos']) {
   });
 }
 
-test('unknown versions and mismatched platforms fail before interception', () => {
-  for (const agent of ['Macintosh NeteaseMusicDesktop/3.1.42.205594', 'Windows NT NeteaseMusicDesktop/3.1.12.3444',
-    'Linux NeteaseMusicDesktop/3.1.12.3444', 'Macintosh NeteaseMusicDesktop/9.9.9']) {
+test('invalid versions and mismatched platforms fail before interception', () => {
+  for (const agent of ['Macintosh NeteaseMusicDesktop/3.1', 'Windows NT NeteaseMusicDesktop/3.1.12.3444',
+    'Linux NeteaseMusicDesktop/3.1.12.3444', 'Macintosh']) {
     const { target } = fixture('macos');
     target.navigator.userAgent = agent;
     assert.throws(() => discover(target), /CLIENT_VERSION_UNVERIFIED|CLIENT_BRIDGE_MISSING/);
   }
 });
+
+function futureMac() {
+  const value = fixture('macos');
+  value.target.navigator.userAgent = 'Macintosh NeteaseMusicDesktop/3.2.0.9999';
+  return value;
+}
+
+for (const [name, make] of [['known', () => fixture('macos')], ['updated', futureMac]]) {
+  test(name + ' Mac qualifies without changing playback or calling native interfaces', () => {
+    const { target, primary, legacy, calls, sdk } = make();
+    target.document.readyState = 'interactive';
+    const originals = [primary.callAdapter, legacy.callAdapter, sdk.AudioPlayer.play, sdk.AudioPlayer.setPreloadInfoResult];
+    assert.equal(discover(target).compatibility, name === 'known' ? 'verified-version' : 'detected-playback-contract');
+    assert.deepEqual(startupReadiness(target), { ready: true, error: null, documentState: 'interactive' });
+    assert.deepEqual([primary.callAdapter, legacy.callAdapter, sdk.AudioPlayer.play, sdk.AudioPlayer.setPreloadInfoResult], originals);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(primary.registerCallMap, {});
+    assert.deepEqual(legacy.registerCallMap, {});
+  });
+
+  for (const [missing, remove] of Object.entries({
+    play: ({ sdk }) => { delete sdk.AudioPlayer.play; },
+    preload: ({ sdk }) => { sdk.AudioPlayer.setPreloadInfoResult = true; },
+    seek: ({ sdk }) => { delete sdk.Bridge.call; },
+    appendEvent: ({ sdk }) => { delete sdk.Bridge.appendRegisterCall; },
+    removeEvent: ({ sdk }) => { delete sdk.Bridge.removeRegisterCall; },
+    awaitEvent: ({ sdk }) => { delete sdk.Bridge.createPromiseFromNativeRegisterCall; },
+    triggerEvent: ({ sdk }) => { sdk.Bridge.triggerRegisterCall = true; },
+    primaryBridge: ({ primary }) => { primary.callAdapter = undefined; },
+    primaryEvents: ({ primary }) => { delete primary._registerCallQueue; },
+    legacyBridge: ({ legacy }) => { legacy.callAdapter = undefined; },
+    legacyEvents: ({ legacy }) => { delete legacy._registerCallQueue; },
+    legacyAdapter: ({ target }) => { delete target.legacyNativeCmder; },
+    states: ({ states }) => { states.Playing = 1; },
+    queue: ({ store }) => { store.getState().playingList.curPlayingList = null; },
+    playing: ({ store }) => { store.getState().playing = true; },
+    dispatch: ({ store }) => { store.dispatch = true; },
+    subscribe: ({ store }) => { store.subscribe = true; },
+    audio: ({ target }) => { delete target.AudioContext; },
+    fetch: ({ target }) => { delete target.fetch; },
+    abort: ({ target }) => { delete target.AbortController; },
+    readOnlyPrimary: ({ primary }) => { Object.defineProperty(primary, 'callAdapter', { value: primary.callAdapter, writable: false }); },
+    readOnlyLegacy: ({ legacy }) => { Object.defineProperty(Object.getPrototypeOf(legacy), 'callAdapter', { writable: false }); },
+    sealedLegacy: ({ legacy }) => { Object.preventExtensions(legacy); },
+    readOnlyPlay: ({ sdk }) => { Object.defineProperty(sdk.AudioPlayer, 'play', { writable: false }); },
+    readOnlyPreload: ({ sdk }) => { Object.defineProperty(sdk.AudioPlayer, 'setPreloadInfoResult', { writable: false }); },
+  })) {
+    test(name + ' Mac rejects changed ' + missing + ' before playback interception', () => {
+      const value = make();
+      remove(value);
+      const originals = [value.primary.callAdapter, value.legacy.callAdapter];
+      assert.throws(() => discover(value.target), /CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED|CLIENT_BRIDGE_MISSING/);
+      assert.equal(startupReadiness(value.target).ready, false);
+      assert.deepEqual([value.primary.callAdapter, value.legacy.callAdapter], originals);
+      assert.deepEqual(value.calls, []);
+      assert.deepEqual(value.primary.registerCallMap, {});
+      assert.deepEqual(value.legacy.registerCallMap, {});
+    });
+  }
+}
 
 test('restoring the Mac bridge preserves a subsequently installed hook', () => {
   const { target, primary } = fixture('macos');

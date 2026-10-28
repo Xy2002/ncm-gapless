@@ -4,7 +4,7 @@
 
 [中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
 
-当前版本：`0.5.0-experimental`。
+当前开发版本：`0.6.0-experimental`。Mac 自动更新通道尚未发布。
 
 ## 适用版本
 
@@ -13,13 +13,13 @@
 | Windows x64 | `3.1.42.205594` | Windows PowerShell 5.1 或 PowerShell 7 |
 | macOS Apple Silicon | `3.1.12.3444` | Python 3；自动启用需要 macOS 27，首次配置需联网 |
 
-这是实验版本。Windows 新版通过内核 ABI 与播放接口检查后可自动继续使用，结构探测不等于真实音频验收；macOS 未验证版本仍拒绝启用。其他系统和架构见 [兼容说明](compatibility.json)。
+上表是历史实测版本。Windows 新版需通过内核 ABI 与播放接口检查；macOS 每次注入都会检查播放接口，兼容的新版可继续启用。检查失败时保留官方播放。结构探测不等于真实音频验收，也不保证所有未来版本可用。其他系统和架构见 [兼容说明](compatibility.json)。
 
 ## 工作原理
 
 网易云桌面客户端的界面运行在内置的 Chromium / CEF 中。启动器通过本机回环地址上的 Chrome DevTools Protocol 调试接口，将补丁加载到客户端页面。PowerShell 和 Python 负责启动、注入与状态查询，音频下载、解码和播放都在客户端页面中完成。
 
-macOS 的持续启用使用系统“快捷指令”的 App 启动触发器。每次普通打开网易云时，系统执行一次短脚本：正常退出并重开缺少调试参数的实例，安装补丁后立即退出。启用状态保存在用户目录，停止脚本会先撤销它，再卸载内存补丁。应用文件和原厂签名保持不变，项目不安装常驻监听进程。
+macOS 的持续启用使用系统“快捷指令”的 App 启动触发器。每次普通打开网易云时，系统执行一次短脚本，正常退出并重开缺少调试参数的实例，再加载补丁。启动器安装在用户目录，按需检查签名更新后退出。停止脚本先撤销自动启用，再卸载内存补丁。应用文件和原厂签名保持不变，项目不安装常驻监听进程。
 
 ```mermaid
 flowchart LR
@@ -88,9 +88,9 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ### macOS
 
-1. 安装好 Python 3 后，双击 `Start-NcmGapless.command` 进入初始化向导。依赖、客户端发现和快捷指令生成由脚本处理。
+1. 安装好 Python 3 后，双击 `Start-NcmGapless.command` 进入初始化向导。脚本把运行文件安装到 `~/Library/Application Support/NcmGapless`，准备独立依赖并生成快捷指令。
 2. 首次按向导在系统界面添加快捷指令、打开网易云自动化并允许脚本运行，回到终端按回车。脚本会实际重开客户端自检，通过后显示“配置完成”。
-3. 首次启用后重新选曲。此后直接从原图标打开网易云，退出重开也会自动启用，直到执行停止脚本；状态可用 `Get-NcmGaplessStatus.command` 查看。
+3. 首次启用后重新选曲。此后直接从原图标打开网易云，退出重开也会自动启用，直到执行停止脚本。安装目录中保留启用、停止和状态三个 `.command` 入口。
 
 也可以在解压目录运行：
 
@@ -98,7 +98,9 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 ./Start-NcmGapless.command
 ```
 
-自动启用需要 macOS 27。首次系统许可需要本人确认，初始化和普通启动都可能正常重开客户端。更早系统的手动方式、非标准路径和错误处理见 [macOS 使用说明](docs/macos.md)。
+配置成功后可删除下载的源码目录，请保留安装目录和 Python 3 本体。自动启用需要 macOS 27。首次系统许可需要本人确认，初始化和普通启动都可能正常重开客户端。更早系统的手动方式、旧版迁移和错误处理见 [macOS 使用说明](docs/macos.md)。
+
+Mac 已实现启动后检查签名更新、下次启动切换版本及失败回退，更新通道尚未配置发布；当前不能依赖它获取新补丁。更新机制与验收边界见 [Mac 自动维护说明](docs/macos-maintenance.md)。
 
 ## 状态与停用
 
@@ -113,12 +115,14 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 | `fallbacks` / `lastError` | 回退次数和最近错误 |
 | `automaticEnabled` | 自动启用状态；停止脚本会关闭它 |
 | `automaticLastResult` / `automaticLastError` | Windows 最近一次启动加载结果与错误代码 |
-| `maintenance` | 可选 Windows 自动维护的最近检查、修复与更新结果 |
+| `maintenance` | 自动维护状态；各平台字段见维护说明 |
 | `shortcutImported` | Mac 系统快捷指令已导入，还需开启其 App 自动化 |
 
 Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` 停用并恢复官方播放。
 
-音频补丁驻留在内存。可选 Windows 启动模块会新增自己的 DLL 与运行文件，保留网易云原有文件；安装后从原入口打开即可自动加载，停止脚本会撤销自动启用。启用自动维护时，系统在客户端关闭后处理签名更新和修复。Mac 完成一次性配置后由系统恢复。Windows 未安装启动模块时，重启后仍需手动运行启动器。手动更新方式应先停用旧版，再从新目录安装或启用并重新选曲。
+音频补丁驻留在内存。可选 Windows 启动模块会新增自己的 DLL 与运行文件，保留网易云原有文件；安装后从原入口打开即可自动加载，停止脚本会撤销自动启用。Windows 自动维护在客户端关闭后处理更新和修复；未安装启动模块时，重启后仍需手动运行启动器。Mac 完成一次性配置后由系统恢复，更新包完整下载并验签后留待下次启动使用。
+
+Windows 手动更新应先停用旧版，再从新目录安装或启用；Mac 手动更新运行新版 `Start`。完成后重新选曲。
 
 停用会取消下载与预取、关闭 Web Audio 引擎、恢复原始桥接，再交回官方播放器。已接管曲目按当前位置和播放 / 暂停状态恢复；仍在加载的曲目从头恢复。
 
@@ -129,6 +133,7 @@ Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` �
 - 加密本地缓存、试听及权限受限音源不接管，不提供会员或版权限制绕过。
 - 官方音效、空间音频、独占设备、蓝牙和系统媒体控制可能与官方播放器表现不同。
 - 随机播放、单曲循环、动态修改队列、切换音质或设备等场景仍需完善。
+- Mac 尚未覆盖同一进程内的页面重载。资源热更新若重建播放器页面，内存补丁会消失，需要正常退出并重新打开客户端。
 
 ## 代码入口
 
@@ -143,6 +148,7 @@ Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` �
 ## 更多文档
 
 - [macOS 使用说明](docs/macos.md)
+- [macOS 自动维护](docs/macos-maintenance.md)
 - [开发与贡献](CONTRIBUTING.md)
 - [实现说明](docs/implementation.md)
 - [路线图](docs/roadmap.md)

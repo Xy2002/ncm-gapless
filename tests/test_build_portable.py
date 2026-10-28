@@ -13,6 +13,12 @@ from build_portable import build, PLATFORM_FILES, VERSION, WINDOWS_STARTUP_FILES
 
 
 class PortableTests(unittest.TestCase):
+    def test_maintenance_payload_cannot_be_added_to_the_other_platform(self):
+        with self.assertRaisesRegex(ValueError, "macOS"):
+            build("windows", include_macos_maintenance=True)
+        with self.assertRaisesRegex(ValueError, "Windows"):
+            build("macos", include_windows_maintenance=True)
+
     def test_maintenance_package_contains_signed_payload_but_no_private_key(self):
         if not (ROOT / 'artifacts/windows-maintenance/windows-update.json').is_file():
             self.skipTest('Sign the Windows payload before checking its maintenance package')
@@ -56,6 +62,11 @@ class PortableTests(unittest.TestCase):
                         entry = archive.getinfo("ncm-gapless/" + name)
                         if name.endswith(".command"):
                             self.assertEqual(entry.external_attr >> 16 & 0o777, 0o755)
+                    if platform == "macos":
+                        self.assertIn("ncm-gapless/tools/macos_maintenance.py", archive.namelist())
+                        self.assertIn("ncm-gapless/tools/macos_updates.py", archive.namelist())
+                        self.assertIn("ncm-gapless/tools/macos-update-public-key.pem", archive.namelist())
+                        self.assertNotIn("ncm-gapless/updates/macos-update.json", archive.namelist())
                     other = "windows" if platform == "macos" else "macos"
                     self.assertTrue(all("ncm-gapless/" + name not in archive.namelist() for name in PLATFORM_FILES[other]))
                     self.assertNotIn("ncm-gapless/requirements-dev.txt", archive.namelist())

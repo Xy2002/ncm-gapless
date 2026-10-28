@@ -25,7 +25,7 @@
     "url": "https://xy2002.github.io/ncm-gapless/",
     "sameAs": "https://github.com/Xy2002/ncm-gapless",
     "downloadUrl": "https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip",
-    "softwareVersion": "0.5.0-experimental",
+    "softwareVersion": "0.6.0-experimental",
     "operatingSystem": ["Windows x64", "macOS Apple Silicon"],
     "applicationCategory": "MultimediaApplication",
     "inLanguage": "zh-CN"
@@ -54,7 +54,7 @@
           <a class="button" href="https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip">下载源码 ZIP <span aria-hidden="true">↓</span></a>
           <a class="text-link" href="#compatibility">先确认适用版本 <span aria-hidden="true">↘</span></a>
         </div>
-        <p class="release">0.5.0-experimental · 实验版本 · Windows / macOS</p>
+        <p class="release">0.6.0-experimental · 开发版本，未发布 · Windows / macOS</p>
         <figure class="continuity">
           <svg viewBox="0 0 960 132" role="img" aria-labelledby="wave-title wave-description">
             <title id="wave-title">两首曲目在同一条时间线上衔接的示意图</title>
@@ -92,7 +92,7 @@
             </tbody>
           </table>
         </div>
-        <p class="note">上表版本已实机验证。Windows 新版通过内核与播放接口检查后可继续加载，检查不通过时保留官方播放；macOS 未验证版本仍拒绝启用。其他版本的真实音频表现仍需验证，手机端和网页版不在适配范围内。</p>
+        <p class="note">上表为历史实测版本。Windows 新版需通过内核与播放接口检查，Mac 每次注入都检查播放接口，兼容的新版可继续启用。检查失败时保留官方播放；结构兼容不等于真实升级和音频验收。手机端和网页版不在适配范围内。</p>
         <a class="text-link" href="https://github.com/Xy2002/ncm-gapless/blob/main/compatibility.json">查看兼容性记录 <span aria-hidden="true">↗</span></a>
       </div>
     </section>
@@ -116,15 +116,15 @@
           <div>
             <h3>macOS</h3>
             <ol>
-              <li>安装 Python 3，双击 <code>Start-NcmGapless.command</code> 进入初始化向导。</li>
+              <li>安装 Python 3，双击 <code>Start-NcmGapless.command</code>，将补丁安装到固定用户目录并进入初始化向导。</li>
               <li>按向导完成首次系统确认，脚本自动准备依赖和快捷指令，并在普通启动自检通过后显示“配置完成”。</li>
               <li>重新选曲，用 <code>Get-NcmGaplessStatus.command</code> 查看状态。</li>
               <li>macOS 27 配置后可直接打开原客户端，退出重开也会自动启用，直到执行停止脚本。</li>
             </ol>
-            <p>辅助脚本按需执行后退出，保留原厂签名。普通启动可能自动重开一次客户端。</p>
+            <p>安装成功后可删除下载目录，请保留 Python 3。安装目录保留启用、停止和状态入口。辅助脚本按需执行后退出，保留原厂签名；普通启动可能正常重开一次客户端。</p>
           </div>
         </div>
-        <p class="note">Windows 自动维护会在客户端关闭后修复缺失模块并获取签名更新。非标准安装路径和启动错误的处理方式见下方使用说明。</p>
+        <p class="note">Windows 自动维护会在客户端关闭后修复缺失模块并获取签名更新。Mac 已实现签名更新检查与失败回退，更新通道尚未发布，当前不能依赖它获取新补丁。非标准安装路径和启动错误的处理方式见下方使用说明。</p>
         <div class="document-links">
           <a class="text-link" href="https://github.com/Xy2002/ncm-gapless#开始使用">完整使用说明 <span aria-hidden="true">↗</span></a>
           <a class="text-link" href="https://github.com/Xy2002/ncm-gapless/blob/main/docs/macos.md">Mac 安装与错误处理 <span aria-hidden="true">↗</span></a>
@@ -154,7 +154,7 @@
         </details>
         <details open>
           <summary>支持所有网易云版本、蓝牙和官方音效吗？</summary>
-          <p>上表记录实测版本，Windows 兼容探测不代表所有未来版本均已适配。未知内核需要等待新的适配补丁。蓝牙、空间音频、独占设备、系统媒体控制和复杂队列操作仍需验证，表现可能与官方播放器不同。当前为实验版本，请先确认自己的使用场景。</p>
+          <p>上表记录历史实测版本，两个平台的兼容探测都不保证所有未来版本可用。内核或播放接口不兼容时需要等待适配。Mac 同一进程内页面重载尚不能自动恢复补丁，需要正常退出并重开客户端。蓝牙、空间音频、独占设备、系统媒体控制和复杂队列操作仍需验证。</p>
         </details>
         <details open>
           <summary>遇到问题应该提供什么信息？</summary>
