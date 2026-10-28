@@ -59,7 +59,7 @@ python tools\build_portable.py
 
 打包工具按清单收集运行文件与脱敏文档，生成 `artifacts/` 下的 ZIP 和包内 SHA-256 清单。研究脚本、开发依赖和本机记录不进入运行包。
 
-默认生成 Windows 包；`python3 tools/build_portable.py --platform macos` 生成 Mac 包。Mac 包包含启动器必需的两个 Python 模块及运行依赖清单，不包含虚拟环境和开发诊断脚本。`.command` 在包内保留执行权限。
+默认生成 Windows 包；`python3 tools/build_portable.py --platform macos` 生成 Mac 包。Mac 包包含启动器必需的两个 Python 模块、通用自动化模板及运行依赖清单，不包含虚拟环境和开发诊断脚本。`.command` 在包内保留执行权限。
 
 ## 技术记录
 

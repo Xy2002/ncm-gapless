@@ -286,7 +286,7 @@
     }, 100);
 
     const api = {
-      version: '0.3.1-experimental', installed: true,
+      version: '0.4.0-experimental', installed: true,
       install: function () { return api.status(); },
       status: function () {
         return Object.assign({ version: api.version, installed, clientVersion: client.version, platform: client.platform,

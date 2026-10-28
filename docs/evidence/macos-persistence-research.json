@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-27",
+  "kind": "read-only-resource-inspection",
+  "clientVersion": "3.1.12.3444",
+  "pack": {
+    "bytes": 37229993,
+    "sha256": "1bf0665902409a3059d1abd79b01c9a37881de18372053950cf2cc8eebf9263b",
+    "firstZipHeader": 100,
+    "endZipRecord": 37229971,
+    "headerHexField": "49b6f1aee0bdc68c8b0feed29fd57b6f",
+    "zipPayloadMd5": "6e5af7b000aa94c9c9863cbcba24756a",
+    "entries": 1377,
+    "encryptedEntries": 0,
+    "mainHtml": "webfiles/app.html",
+    "mainHtmlBytes": 11631,
+    "applicationChunk": "976f18d"
+  },
+  "runningApplicationChunk": "114fa7e",
+  "applicationSignatureStrictDeepValid": true,
+  "packMatchesResourceSeal": true,
+  "nativePackVerificationSelectorsPresent": true,
+  "userResourceDirectoryReadable": false,
+  "backgroundAgentInstalled": false,
+  "backgroundAgentLoaded": false,
+  "applicationModified": false,
+  "modifiedApplicationLaunchTested": false,
+  "accountOrAudioDataRead": false
+}

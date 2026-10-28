@@ -4,20 +4,22 @@
 
 [中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
 
-当前版本：`0.3.1-experimental`。
+当前版本：`0.4.0-experimental`。
 
 ## 适用版本
 
 | 平台 | 网易云客户端 | 运行要求 |
 | --- | --- | --- |
 | Windows x64 | `3.1.42.205594` | Windows PowerShell 5.1 或 PowerShell 7 |
-| macOS Apple Silicon | `3.1.12.3444` | Python 3，首次运行需要联网 |
+| macOS Apple Silicon | `3.1.12.3444` | Python 3；自动启用需要 macOS 27，首次配置需联网 |
 
 这是实验版本。未知客户端版本会拒绝启用；其他系统和架构的兼容情况见 [兼容说明](compatibility.json)。
 
 ## 工作原理
 
 网易云桌面客户端的界面运行在内置的 Chromium / CEF 中。启动器通过本机回环地址上的 Chrome DevTools Protocol 调试接口，将补丁加载到客户端页面。PowerShell 和 Python 负责启动、注入与状态查询，音频下载、解码和播放都在客户端页面中完成。
+
+macOS 的持续启用使用系统“快捷指令”的 App 启动触发器。每次普通打开网易云时，系统执行一次短脚本：正常退出并重开缺少调试参数的实例，安装补丁后立即退出。启用状态保存在用户目录，停止脚本会先撤销它，再卸载内存补丁。应用文件和原厂签名保持不变，项目不安装常驻监听进程。
 
 ```mermaid
 flowchart LR
@@ -64,11 +66,11 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ## 开始使用
 
-下载仓库源码 ZIP 或克隆仓库。使用便携包时也需完整解压并保留目录结构，启动前先完全退出网易云。
+下载仓库源码 ZIP 或克隆仓库。使用便携包时也需完整解压并保留目录结构。
 
 ### Windows
 
-1. 双击 `Start-NcmGapless.cmd` 启动并启用。
+1. 完全退出网易云，再双击 `Start-NcmGapless.cmd` 启动并启用。
 2. 在网易云中重新选择一首歌曲开始播放。
 3. 双击 `Get-NcmGaplessStatus.cmd` 查看状态。
 
@@ -80,9 +82,9 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ### macOS
 
-1. 安装好 Python 3 后，双击 `Start-NcmGapless.command`。
-2. 首次运行会在程序目录创建 `.venv` 并安装依赖，之后自动复用。
-3. 在网易云中重新选曲，双击 `Get-NcmGaplessStatus.command` 查看状态。
+1. 安装好 Python 3 后，双击 `Start-NcmGapless.command` 进入初始化向导。依赖、客户端发现和快捷指令生成由脚本处理。
+2. 首次按向导在系统界面添加快捷指令、打开网易云自动化并允许脚本运行，回到终端按回车。脚本会实际重开客户端自检，通过后显示“配置完成”。
+3. 首次启用后重新选曲。此后直接从原图标打开网易云，退出重开也会自动启用，直到执行停止脚本；状态可用 `Get-NcmGaplessStatus.command` 查看。
 
 也可以在解压目录运行：
 
@@ -90,7 +92,7 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 ./Start-NcmGapless.command
 ```
 
-启动器不会向系统 Python 安装包。非标准路径、手动安装和错误处理见 [macOS 使用说明](docs/macos.md)。
+自动启用需要 macOS 27。首次系统许可需要本人确认，初始化和普通启动都可能正常重开客户端。更早系统的手动方式、非标准路径和错误处理见 [macOS 使用说明](docs/macos.md)。
 
 ## 状态与停用
 
@@ -103,10 +105,12 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 | `decodedBytes` | 当前与下一首的 PCM 缓冲字节数，不含进程其他内存 |
 | `lastBoundaryDeltaFrames` | 最近一次换曲的计划边界帧差，`0` 表示调度对齐，尚未换曲时为 `null` |
 | `fallbacks` / `lastError` | 回退次数和最近错误 |
+| `automaticEnabled` | Mac 自动启用状态；停止脚本会关闭它 |
+| `shortcutImported` | Mac 系统快捷指令已导入，还需开启其 App 自动化 |
 
 Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` 停用并恢复官方播放。
 
-补丁只驻留在内存，不修改网易云安装文件。重启网易云后需要重新启用；更新补丁前，先停用旧版，再启动新版并重新选曲。
+补丁只驻留在内存，不修改网易云安装文件。Windows 重启后需重新运行启动器；Mac 完成一次性配置后由系统自动恢复。更新补丁或移动程序目录前，先停用旧版，再从新目录启用并重新选曲。
 
 停用会取消下载与预取、关闭 Web Audio 引擎、恢复原始桥接，再交回官方播放器。已接管曲目按当前位置和播放 / 暂停状态恢复；仍在加载的曲目从头恢复。
 

@@ -1,0 +1,36 @@
+{
+  "WFWorkflowTriggers": [
+    {
+      "WFTriggerSerializedParameters": {
+        "WFSelectedApps": {
+          "BundleIdentifier": "com.netease.163music",
+          "Name": "网易云音乐",
+          "TeamIdentifier": "43B53CMF9D"
+        }
+      },
+      "WFTriggerIdentifier": "WFAppInFocusTrigger"
+    }
+  ],
+  "WFWorkflowMinimumClientVersionString": "900",
+  "WFWorkflowMinimumClientVersion": 900,
+  "WFWorkflowClientVersion": "5037.0.19",
+  "WFWorkflowIcon": {
+    "WFWorkflowIconStartColor": -2873601,
+    "WFWorkflowIconGlyphNumber": 61440
+  },
+  "WFWorkflowActions": [
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.runshellscript",
+      "WFWorkflowActionParameters": {
+        "Script": "runner=\"$HOME/Library/Application Support/NcmGapless/on-open.command\"\nif [ -x \"$runner\" ]; then\n    exec \"$runner\"\nfi"
+      }
+    }
+  ],
+  "WFWorkflowInputContentItemClasses": [],
+  "WFWorkflowOutputContentItemClasses": [],
+  "WFWorkflowHasOutputFallback": false,
+  "WFWorkflowImportQuestions": [],
+  "WFQuickActionSurfaces": [],
+  "WFWorkflowTypes": [],
+  "WFWorkflowHasShortcutInputVariables": false
+}
