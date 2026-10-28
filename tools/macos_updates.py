@@ -315,6 +315,9 @@ def _store(base, pointer, manifest, files, check=lambda: None):
     target = versions / pointer["digest"]
     if target.exists() or target.is_symlink():
         _runtime(base, pointer)
+        target.chmod(0o555)
+        _sync_directory(target)
+        _sync_directory(versions)
         return target
     stage = Path(tempfile.mkdtemp(prefix=".staging-", dir=versions))
     try:
@@ -330,10 +333,14 @@ def _store(base, pointer, manifest, files, check=lambda: None):
             path.chmod(0o444)
         _runtime(base, pointer, stage)
         _check(check)
-        for path in (stage / "src", stage / "tools", stage):
+        for path in (stage / "src", stage / "tools"):
             path.chmod(0o555)
             _sync_directory(path)
+        # Older macOS requires write access to the directory being renamed.
+        _sync_directory(stage)
         stage.rename(target)
+        target.chmod(0o555)
+        _sync_directory(target)
         _sync_directory(versions)
     finally:
         if stage.exists():

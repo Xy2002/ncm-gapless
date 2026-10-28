@@ -245,6 +245,42 @@ class MacUpdatesTests(unittest.TestCase):
         self.assertEqual(updates.active_runtime(self.base), self.local)
         self.assertFalse(list((self.base / "versions").glob(".staging-*")))
 
+    def test_directory_is_renamable_then_readonly_before_activation(self):
+        rename = Path.rename
+        save = updates._save
+        renamed = []
+        def require_writable_directory(path, target):
+            if path.name.startswith(".staging-"):
+                if not path.stat().st_mode & stat.S_IWUSR:
+                    raise PermissionError("read-only source directory")
+                renamed.append(target)
+            return rename(path, target)
+        def require_sealed_runtime(base, state, check=lambda: None):
+            runtime = base / "versions" / state["active"]["digest"]
+            for directory in (runtime, runtime / "src", runtime / "tools"):
+                self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o555)
+            return save(base, state, check)
+        with patch.object(Path, "rename", require_writable_directory), patch.object(updates, "_save", require_sealed_runtime):
+            self.assertEqual(self.check(self.release())["result"], "updated")
+        self.assertEqual(renamed, [updates.active_runtime(self.base)])
+
+    def test_interrupted_directory_sealing_keeps_old_runtime_and_retries(self):
+        release = self.release()
+        chmod = Path.chmod
+        interrupted = []
+        def fail_new_runtime(path, mode, *args, **kwargs):
+            if path.parent == self.base / "versions" and not path.name.startswith(".") and mode == 0o555:
+                interrupted.append(path)
+                raise OSError("interrupted after rename")
+            return chmod(path, mode, *args, **kwargs)
+        with patch.object(Path, "chmod", fail_new_runtime):
+            self.assertEqual(self.check(release)["result"], "failed")
+        self.assertEqual(updates.active_runtime(self.base), self.local)
+        self.assertEqual(len(interrupted), 1)
+        self.assertEqual(self.check(release)["result"], "updated")
+        self.assertEqual(updates.active_runtime(self.base), interrupted[0])
+        self.assertEqual(stat.S_IMODE(interrupted[0].stat().st_mode), 0o555)
+
     def test_partial_file_write_is_discarded_before_retry(self):
         release = self.release()
         original = Path.open
