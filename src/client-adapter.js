@@ -8,7 +8,8 @@
     const version = /NeteaseMusicDesktop\/([\d.]+)/.exec(target.navigator.userAgent);
     const platform = /Macintosh/.test(target.navigator.userAgent) ? 'macos' : /Windows NT/.test(target.navigator.userAgent) ? 'windows' : null;
     const versions = { windows: '3.1.42.205594', macos: '3.1.12.3444' };
-    if (!version || !platform || version[1] !== versions[platform]) throw new Error('CLIENT_VERSION_UNVERIFIED');
+    if (!version || !platform || !/^\d+(\.\d+){2,3}$/.test(version[1]) ||
+        (platform === 'macos' && version[1] !== versions.macos)) throw new Error('CLIENT_VERSION_UNVERIFIED');
     if (!target.webpackJsonp || (platform === 'windows' ? typeof target.channel?.call !== 'function' : typeof target.ncmChannelOSX?.postMessage !== 'function')) throw new Error('CLIENT_BRIDGE_MISSING');
     if (target.__ncmGapless) throw new Error('OLD_PATCH_STILL_LOADED');
     let require;
@@ -44,6 +45,18 @@
       pending.push(fiber.child, fiber.sibling);
     }
     if (!sdk || !preload || !refresh || !store || !states || !store.getState().playingList) throw new Error('PLAYBACK_INTERFACE_MISSING');
+    // New Windows releases qualify by the complete playback contract, not by UA alone.
+    // Probe without native calls, dispatching actions, or modifying playback bridges.
+    if (platform === 'windows' && version[1] !== versions.windows) {
+      const state = store.getState();
+      if (!state.playing || !Array.isArray(state.playingList.curPlayingList) ||
+          states.Playing !== 2 || states.Pause !== 1 || states.Stop !== 0 ||
+          typeof sdk.AudioPlayer.play !== 'function' ||
+          !['appendRegisterCall', 'removeRegisterCall', 'createPromiseFromNativeRegisterCall'].every(key => typeof sdk.Bridge[key] === 'function') ||
+          typeof sdk.Bridge._Adapter?._registerCallQueue !== 'function' ||
+          typeof target.AudioContext !== 'function' || typeof target.fetch !== 'function' ||
+          typeof target.AbortController !== 'function') throw new Error('CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED');
+    }
     const bridges = platform === 'windows' ? [target.channel] : [...new Set([sdk.Bridge._Adapter, target.legacyNativeCmder?._envAdapter].filter(Boolean))];
     const callMethod = platform === 'windows' ? 'call' : 'callAdapter';
     if (bridges.some(bridge => typeof bridge[callMethod] !== 'function' || (platform === 'macos' && typeof bridge._registerCallQueue !== 'function'))) throw new Error('CLIENT_BRIDGE_MISSING');
@@ -133,7 +146,7 @@
         clearTimeout(timer); if (abortHandler) signal?.removeEventListener('abort', abortHandler);
       }
     }
-    return { version: version[1], platform, sdk: sdk, states: states, store: store, nextInfo: nextInfo, refreshInfo, emit: emit, callNative, intercept,
+    return { version: version[1], compatibility: version[1] === versions[platform] ? 'verified-version' : 'detected-playback-contract', platform, sdk: sdk, states: states, store: store, nextInfo: nextInfo, refreshInfo, emit: emit, callNative, intercept,
       getState: () => store.getState(), subscribe: callback => store.subscribe(callback),
       replay: function (item) {
         return store.dispatch({ type: 'playing/setPlaying', payload: {

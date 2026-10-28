@@ -27,9 +27,12 @@ param([int]$Port,[int]$ClientProcessId,[string]$StartedFileTime,[string]$Token)
     [IO.File]::WriteAllText((Join-Path $helperDirectory 'AutoAttach-NcmGapless.ps1'), $helper, [Text.Encoding]::ASCII)
     $cases = @(
         @{ name='ordinary'; args=''; enabled=$true; expect=$true; helper=$true; calls=1 },
+        @{ name='versioned-runtime'; args=''; enabled=$true; expect=$true; helper=$true; calls=1 },
+        @{ name='invalid-runtime-pointer'; args=''; enabled=$true; expect=$true; helper=$false; calls=1 },
         @{ name='existing-port'; args='--existing-port'; enabled=$true; expect=$true; helper=$true; calls=1 },
         @{ name='disabled'; args=''; enabled=$false; expect=$false; helper=$false; calls=1 },
         @{ name='unknown-cef'; args='--unverified-cef'; enabled=$true; expect=$false; helper=$false; calls=1 },
+        @{ name='changed-cef-abi'; args='--mismatched-api'; enabled=$true; expect=$false; helper=$false; calls=1 },
         @{ name='readonly'; args='--readonly'; enabled=$true; expect=$false; helper=$false; calls=1 },
         @{ name='small-command'; args='--small-command'; enabled=$true; expect=$false; helper=$false; calls=1 },
         @{ name='renderer'; args='--type=renderer --renderer-process'; enabled=$true; expect=$false; helper=$false; calls=1 },
@@ -41,6 +44,15 @@ param([int]$Port,[int]$ClientProcessId,[string]$StartedFileTime,[string]$Token)
         @{ name='cancel-after-before'; args='--cancel-after-before'; enabled=$true; expect=$true; helper=$false; calls=1 }
     )
     foreach ($case in $cases) {
+        $pointer=Join-Path $fixture 'ncm-gapless\active.txt'
+        [IO.File]::Delete($pointer)
+        if ($case.name -eq 'versioned-runtime') {
+            $digest='a'*64
+            $versioned=Join-Path $fixture "ncm-gapless\versions\$digest\tools"
+            [void][IO.Directory]::CreateDirectory($versioned)
+            [IO.File]::WriteAllText((Join-Path $versioned 'AutoAttach-NcmGapless.ps1'),$helper,[Text.Encoding]::ASCII)
+            [IO.File]::WriteAllText($pointer,$digest)
+        } elseif ($case.name -eq 'invalid-runtime-pointer') { [IO.File]::WriteAllText($pointer,'../../escape') }
         $profile = Join-Path $fixture $case.name
         $state = Join-Path $profile 'NCMGapless\startup'
         [void][IO.Directory]::CreateDirectory($state)

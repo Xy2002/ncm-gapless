@@ -286,10 +286,10 @@
     }, 100);
 
     const api = {
-      version: '0.4.0-experimental', installed: true,
+      version: '0.5.0-experimental', installed: true,
       install: function () { return api.status(); },
       status: function () {
-        return Object.assign({ version: api.version, installed, clientVersion: client.version, platform: client.platform,
+        return Object.assign({ version: api.version, installed, clientVersion: client.version, clientCompatibility: client.compatibility, platform: client.platform,
           active: !!current, contextState: context.state, sampleRate: context.sampleRate, playbackRate: engine.rate, playing: engine.playing,
           position: engine.position(), duration: engine.current?.buffer.duration || 0,
           nextReady: !!engine.next, waitingForOfficialHandoff: !!handoff,

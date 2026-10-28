@@ -13,6 +13,7 @@ if (-not $enabled -or $enabled.token -cne $Token) { exit 0 }
 $operation = $null
 $receipt = [ordered]@{ token = $Token; processId = $ClientProcessId; startedFileTime = $StartedFileTime
     port = $Port; result = 'waiting'; error = $null; installed = $false
+    clientPath = $enabled.clientPath; runtimeDigest = (Split-Path (Split-Path $PSScriptRoot -Parent) -Leaf)
     readinessAttempts = 0; lastReadinessError = $null; documentState = $null }
 try {
     $operation = Enter-NcmStartupLock
@@ -35,7 +36,7 @@ try {
             $match = [regex]::Match($_.ToString(), 'NCM_[A-Z_]+')
             $receipt.lastReadinessError = $(if ($match.Success) { $match.Value } else { 'NCM_STARTUP_TRANSPORT_NOT_READY' })
         }
-        if ($receipt.lastReadinessError -ceq 'CLIENT_VERSION_UNVERIFIED') { throw 'CLIENT_VERSION_UNVERIFIED' }
+        if ($receipt.lastReadinessError -in @('CLIENT_VERSION_UNVERIFIED','CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED')) { throw $receipt.lastReadinessError }
         if ($clock.Elapsed.TotalSeconds -ge $StartupTimeoutSeconds) { throw $(if ($receipt.lastReadinessError) { $receipt.lastReadinessError } else { 'NCM_STARTUP_NOT_READY' }) }
         Start-Sleep -Milliseconds 200
     } while ($true)

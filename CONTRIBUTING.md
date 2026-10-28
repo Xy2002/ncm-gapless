@@ -68,4 +68,6 @@ Windows 可选启动模块先用 `tools/build_windows_startup.ps1` 构建，再�
 
 ## 技术记录
 
+Windows 自动维护使用 `tests/windows-maintenance.test.ps1` 验证真实签名、缓存修复、原子版本切换、中断恢复、故障回退和卸载重装。`--windows-maintenance` 打包需要先在本地签名生成固定载荷；签名私钥不得提交或输出，远端签名配置需要密钥所有者明确授权。发布流程与权限边界见 [维护说明](docs/windows-maintenance.md)。
+
 实现与历史问题见 [实现记录](docs/implementation.md)。平台数据见 [兼容说明](compatibility.json)，运行记录保存在 [docs/evidence](docs/evidence/)。这些记录按版本保留，不能替代其他设备和版本的运行检查。

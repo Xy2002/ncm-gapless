@@ -13,6 +13,22 @@ from build_portable import build, PLATFORM_FILES, VERSION, WINDOWS_STARTUP_FILES
 
 
 class PortableTests(unittest.TestCase):
+    def test_maintenance_package_contains_signed_payload_but_no_private_key(self):
+        if not (ROOT / 'artifacts/windows-maintenance/windows-update.json').is_file():
+            self.skipTest('Sign the Windows payload before checking its maintenance package')
+        with redirect_stdout(StringIO()):
+            output = build('windows', include_windows_maintenance=True)
+        with zipfile.ZipFile(output) as archive:
+            names = archive.namelist()
+            self.assertEqual(len(names), len(set(names)))
+            self.assertIn('ncm-gapless/updates/windows-update.json', names)
+            self.assertIn('ncm-gapless/updates/windows-payload.zip', names)
+            self.assertIn('ncm-gapless/tools/update-public-key.xml', names)
+            self.assertTrue(all('private' not in name and '.dpapi' not in name for name in names))
+            manifest=json.loads(archive.read('ncm-gapless/manifest.json'))
+            for name, expected in manifest['sha256'].items():
+                self.assertEqual(hashlib.sha256(archive.read('ncm-gapless/'+name)).hexdigest(), expected)
+
     def test_windows_startup_package_contains_compiled_loader_and_complete_runtime(self):
         if not (ROOT / "native/windows/MSIMG32.dll").is_file():
             self.skipTest("Build the Windows native loader before checking its package")

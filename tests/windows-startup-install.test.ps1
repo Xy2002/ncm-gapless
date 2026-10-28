@@ -27,8 +27,9 @@ $manifest = [ordered]@{ owner='ncm-gapless-windows-startup-v1'; clientVersion='3
 [IO.File]::WriteAllText((Join-Path $payload 'manifest.json'), ($manifest | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
 $worker = Join-Path $repository 'tools\Set-NcmStartupInstallation.ps1'
 $resultPath = Join-Path $payload 'result.json'
-function Run-Installation([string]$Action='Install') {
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $worker -ClientPath $client -Payload $payload -ResultPath $resultPath -Action $Action
+function Run-Installation([string]$Action='Install',[switch]$Repair) {
+    $extra = @(); if ($Repair) { $extra += '-Repair' }
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $worker -ClientPath $client -Payload $payload -ResultPath $resultPath -Action $Action @extra
     return (Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json)
 }
 $result = Run-Installation
@@ -40,6 +41,12 @@ Write-Host 'PASS installation copies only the declared loader and runtime bytes'
 $result = Run-Installation
 if (-not $result.success) { throw "REINSTALL_FAILED: $($result.error)" }
 Write-Host 'PASS repeat installation validates ownership and succeeds'
+[IO.File]::Delete((Join-Path $clientRoot 'MSIMG32.dll'))
+[IO.File]::Delete((Join-Path $clientRoot 'ncm-gapless\src\client-adapter.js'))
+$result = Run-Installation -Repair
+if (-not $result.success -or -not [IO.File]::Exists((Join-Path $clientRoot 'MSIMG32.dll')) -or
+    (Get-FileHash -LiteralPath (Join-Path $clientRoot 'ncm-gapless\src\client-adapter.js')).Hash -ine $hashes['ncm-gapless\src\client-adapter.js']) { throw 'REPAIR_FAILED' }
+Write-Host 'PASS missing loader and runtime files are repaired without changing the client'
 $changed = Join-Path $clientRoot 'ncm-gapless\tools\AutoAttach-NcmGapless.ps1'
 $saved = [IO.File]::ReadAllBytes($changed)
 [IO.File]::AppendAllText($changed, '# user change')
@@ -58,4 +65,4 @@ Write-Host 'PASS removal preserves user files and the original executable'
 $result = Run-Installation
 if ($result.success -or $result.error -cne 'NCM_STARTUP_INSTALLATION_CONFLICT' -or [IO.File]::ReadAllText((Join-Path $clientRoot 'MSIMG32.dll')) -cne 'unrelated loader') { throw 'FOREIGN_LOADER_WAS_NOT_PRESERVED' }
 Write-Host 'PASS a pre-existing loader is never overwritten'
-Write-Host '5 installation ownership checks passed. The real installation was not modified.'
+Write-Host '6 installation ownership checks passed. The real installation was not modified.'

@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.4.0-experimental"
+VERSION = "0.5.0-experimental"
 FILES = [
     "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "docs/windows-startup.md",
     "docs/windows-automatic-investigation.md", "LICENSES/CEF.txt", "compatibility.json",
@@ -25,25 +25,36 @@ FILES = [
 ]
 PLATFORM_FILES = {
     "windows": ["Start-NcmGapless.cmd", "Start-NcmGapless.ps1", "Stop-NcmGapless.cmd", "Stop-NcmGapless.ps1",
-                "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1", "tools/Ncm-StartupState.ps1"],
+                "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1", "tools/Ncm-StartupState.ps1", "tools/Ncm-ClientCompatibility.ps1"],
     "macos": ["Start-NcmGapless.command", "Stop-NcmGapless.command", "Get-NcmGaplessStatus.command",
               "tools/macos_launcher.py", "tools/macos_automation.json", "tools/cdp_probe.py", "requirements-macos.txt"],
 }
 WINDOWS_STARTUP_FILES = [
     "Install-NcmGaplessStartup.cmd", "Install-NcmGaplessStartup.ps1", "Uninstall-NcmGaplessStartup.cmd",
     "tools/AutoAttach-NcmGapless.ps1", "tools/Set-NcmStartupInstallation.ps1", "native/windows/MSIMG32.dll",
+    'Install-NcmGaplessMaintenance.ps1', 'tools/Ncm-Maintenance.ps1',
+]
+WINDOWS_MAINTENANCE_FILES = [
+    'Install-NcmGaplessMaintenance.cmd', 'Install-NcmGaplessMaintenance.ps1', 'Uninstall-NcmGaplessMaintenance.cmd',
+    'tools/Ncm-Maintenance.ps1', 'tools/Invoke-NcmMaintenance.ps1', 'tools/update-public-key.xml',
+    'docs/windows-maintenance.md',
 ]
 
 
-def build(platform, include_windows_startup=False):
+def build(platform, include_windows_startup=False, include_windows_maintenance=False):
+    if include_windows_maintenance:
+        include_windows_startup = True
     if include_windows_startup and platform != "windows":
         raise ValueError("The Windows startup loader is only available in the Windows package")
-    suffix = platform + ("-startup" if include_windows_startup else "")
+    suffix = platform + ("-maintenance" if include_windows_maintenance else "-startup" if include_windows_startup else "")
     output = ROOT / "artifacts" / f"ncm-gapless-{VERSION.split('-')[0]}-{suffix}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     files = FILES + PLATFORM_FILES[platform]
     if include_windows_startup:
         files += WINDOWS_STARTUP_FILES
+    if include_windows_maintenance:
+        files += WINDOWS_MAINTENANCE_FILES
+    files = list(dict.fromkeys(files))
     manifest = {"version": VERSION, "platform": platform,
                 "clientVersion": "3.1.12.3444" if platform == "macos" else "3.1.42.205594", "sha256": {}}
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -57,6 +68,11 @@ def build(platform, include_windows_startup=False):
             entry.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(entry, data)
             manifest["sha256"][name] = hashlib.sha256(data).hexdigest()
+        if include_windows_maintenance:
+            for name in ('windows-update.json', 'windows-payload.zip'):
+                data = (ROOT / 'artifacts/windows-maintenance' / name).read_bytes()
+                archive.writestr('ncm-gapless/updates/' + name, data)
+                manifest['sha256']['updates/' + name] = hashlib.sha256(data).hexdigest()
         archive.writestr("ncm-gapless/manifest.json", json.dumps(manifest, indent=2) + "\n")
     with zipfile.ZipFile(output) as archive:
         if archive.testzip() is not None:
@@ -73,8 +89,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", choices=tuple(PLATFORM_FILES), default="windows")
     parser.add_argument("--windows-startup", action="store_true", help="Include the locally built optional Windows startup loader")
+    parser.add_argument('--windows-maintenance', action='store_true', help='Include the signed Windows maintenance installer and payload')
     args = parser.parse_args()
-    build(args.platform, include_windows_startup=args.windows_startup)
+    build(args.platform, include_windows_startup=args.windows_startup, include_windows_maintenance=args.windows_maintenance)
 
 
 if __name__ == "__main__":

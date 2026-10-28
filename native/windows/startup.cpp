@@ -81,22 +81,12 @@ static std::wstring EnabledGeneration() {
     return SamePath(target, client_path) ? token : L"";
 }
 static bool SupportedClient() {
-    DWORD ignored = 0, size = GetFileVersionInfoSizeW(client_path.c_str(), &ignored);
-    if (!size || size > 1024 * 1024) return false;
-    std::vector<unsigned char> bytes(size);
-    if (!GetFileVersionInfoW(client_path.c_str(), 0, size, bytes.data())) return false;
-    struct Translation { WORD language, codepage; };
-    Translation* translations = NULL;
-    UINT translation_bytes = 0;
-    if (!VerQueryValueW(bytes.data(), L"\\VarFileInfo\\Translation", (void**)&translations, &translation_bytes)) return false;
-    for (UINT index = 0; index < translation_bytes / sizeof(Translation); ++index) {
-        wchar_t key[100];
-        swprintf_s(key, L"\\StringFileInfo\\%04x%04x\\ProductVersion", translations[index].language, translations[index].codepage);
-        wchar_t* version = NULL; UINT length = 0;
-        if (VerQueryValueW(bytes.data(), key, (void**)&version, &length) && version &&
-            wcscmp(version, L"3.1.42.205594") == 0) return true;
-    }
-    return false;
+    // Match the C ABI, independently of the application's release number.
+    // Only call this API after the CEF 91 version gate below (newer CEF changed it).
+    const auto hash = (const char* (*)(int))GetProcAddress(GetModuleHandleW(L"libcef.dll"), "cef_api_hash");
+    if (!hash) return false;
+    const char* value = hash(0);
+    return value && strcmp(value, "135912956b05b8d66775a091c5f7f17ae26eb09c") == 0;
 }
 static unsigned short AvailablePort() {
     WSADATA data;
@@ -189,7 +179,14 @@ static void StartHelper() {
     UINT length = GetSystemDirectoryW(system, 32768);
     if (!length || length >= 32768) return;
     const std::wstring executable = std::wstring(system) + L"\\WindowsPowerShell\\v1.0\\powershell.exe";
-    const std::wstring script = Parent(module_path) + L"\\ncm-gapless\\tools\\AutoAttach-NcmGapless.ps1";
+    std::wstring runtime = Parent(module_path) + L"\\ncm-gapless";
+    const std::string active = ReadSmallFile(runtime + L"\\active.txt");
+    if (!active.empty()) {
+        if (active.size() != 64) return;
+        for (char ch : active) if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) return;
+        runtime += L"\\versions\\" + FromUtf8(active);
+    }
+    const std::wstring script = runtime + L"\\tools\\AutoAttach-NcmGapless.ps1";
     std::wstring arguments = L"\"" + executable + L"\" -NoLogo -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"" +
         script + L"\" -Port " + std::to_wstring(debug_port) + L" -ClientProcessId " + std::to_wstring(GetCurrentProcessId()) +
         L" -StartedFileTime " + std::to_wstring(StartedFileTime()) + L" -Token " + generation;
@@ -209,8 +206,8 @@ static int Initialize(const void* args, const void* settings, CefApp* app, void*
         if (length && length < 32768) client_path.assign(executable, length);
         const auto version = (int (*)(int))GetProcAddress(GetModuleHandleW(L"libcef.dll"), "cef_version_info");
         generation = EnabledGeneration();
-        if (app && app->base.size >= 48 && app->base.add_ref && app->base.release && !generation.empty() && SupportedClient() && version &&
-            version(0) == 91 && version(1) == 2 && version(2) == 3 && version(6) == 4472 &&
+        if (version && version(0) == 91 && version(6) == 4472 && SupportedClient() &&
+            app && app->base.size >= 48 && app->base.add_ref && app->base.release && !generation.empty() &&
             SamePath(Parent(client_path), Parent(module_path))) {
             original_before = app->before_command_line;
             app->base.add_ref(&app->base);

@@ -40,6 +40,9 @@ extern "C" __declspec(dllexport) int cef_version_info(int entry) {
     const int entries[] = {91, 2, 3, 0, 91, 0, 4472, 169};
     return entry == 0 && Mode(L"--unverified-cef") ? 92 : (entry >= 0 && entry < 8 ? entries[entry] : 0);
 }
+extern "C" __declspec(dllexport) const char* cef_api_hash(int) {
+    return Mode(L"--mismatched-api") ? "different-abi" : "135912956b05b8d66775a091c5f7f17ae26eb09c";
+}
 extern "C" __declspec(dllexport) int cef_initialize(const void*, const void*, CefApp* app, void*) {
     switches.clear(); original_switches = 0; command_references = 1; ownership_errors = 0;
     CefCommandLine command = {};

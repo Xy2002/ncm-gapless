@@ -4,7 +4,7 @@
 
 [中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
 
-当前版本：`0.4.0-experimental`。
+当前版本：`0.5.0-experimental`。
 
 ## 适用版本
 
@@ -13,7 +13,7 @@
 | Windows x64 | `3.1.42.205594` | Windows PowerShell 5.1 或 PowerShell 7 |
 | macOS Apple Silicon | `3.1.12.3444` | Python 3；自动启用需要 macOS 27，首次配置需联网 |
 
-这是实验版本。未知客户端版本会拒绝启用；其他系统和架构的兼容情况见 [兼容说明](compatibility.json)。
+这是实验版本。Windows 新版通过内核 ABI 与播放接口检查后可自动继续使用，结构探测不等于真实音频验收；macOS 未验证版本仍拒绝启用。其他系统和架构见 [兼容说明](compatibility.json)。
 
 ## 工作原理
 
@@ -70,6 +70,8 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ### Windows
 
+希望网易云更新后自动检查兼容、恢复加载模块和获取补丁更新，可完整解压 Windows maintenance 包并运行 `Install-NcmGaplessMaintenance.cmd`。一次管理员安装后，系统任务定时短暂运行；运行中的客户端延后处理，不会自动关闭或重开。更新包必须通过内置公钥验签，离线可从缓存修复。详见 [自动维护说明](docs/windows-maintenance.md)。
+
 需要从原图标、菜单、程序或其他入口打开时自动启用，可安装可选的 [Windows 启动模块](docs/windows-startup.md)：彻底退出客户端，双击 `Install-NcmGaplessStartup.cmd` 完成一次性安装。它在客户端初始化时加载补丁，加载器完成后退出；不会自动关闭或重开网易云。该入口需要含已编译模块的 Windows startup 包，源码用户需先构建。
 
 只对本次运行启用时：
@@ -111,11 +113,12 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 | `fallbacks` / `lastError` | 回退次数和最近错误 |
 | `automaticEnabled` | 自动启用状态；停止脚本会关闭它 |
 | `automaticLastResult` / `automaticLastError` | Windows 最近一次启动加载结果与错误代码 |
+| `maintenance` | 可选 Windows 自动维护的最近检查、修复与更新结果 |
 | `shortcutImported` | Mac 系统快捷指令已导入，还需开启其 App 自动化 |
 
 Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` 停用并恢复官方播放。
 
-音频补丁驻留在内存。可选 Windows 启动模块会新增自己的 DLL 与运行文件，保留网易云原有文件；安装后从原入口打开即可自动加载，停止脚本会撤销自动启用。Mac 完成一次性配置后由系统恢复。Windows 未安装启动模块时，重启后仍需手动运行启动器。更新前先停用旧版，再从新目录安装或启用并重新选曲。
+音频补丁驻留在内存。可选 Windows 启动模块会新增自己的 DLL 与运行文件，保留网易云原有文件；安装后从原入口打开即可自动加载，停止脚本会撤销自动启用。启用自动维护时，系统在客户端关闭后处理签名更新和修复。Mac 完成一次性配置后由系统恢复。Windows 未安装启动模块时，重启后仍需手动运行启动器。手动更新方式应先停用旧版，再从新目录安装或启用并重新选曲。
 
 停用会取消下载与预取、关闭 Web Audio 引擎、恢复原始桥接，再交回官方播放器。已接管曲目按当前位置和播放 / 暂停状态恢复；仍在加载的曲目从头恢复。
 

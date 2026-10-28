@@ -3,14 +3,18 @@ param([string]$ClientPath, [switch]$Uninstall)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'tools\Ncm-StartupState.ps1')
-if ($Uninstall) { & (Join-Path $PSScriptRoot 'Stop-NcmGapless.ps1') | Out-Null }
+. (Join-Path $PSScriptRoot 'tools\Ncm-ClientCompatibility.ps1')
+if ($Uninstall) {
+    $maintenanceConfig = Join-Path ${env:ProgramFiles} 'NCMGaplessMaintenance\config.json'
+    if ([IO.File]::Exists($maintenanceConfig)) { & (Join-Path $PSScriptRoot 'Install-NcmGaplessMaintenance.ps1') -Uninstall }
+    & (Join-Path $PSScriptRoot 'Stop-NcmGapless.ps1') | Out-Null
+}
 $infoScript = Join-Path $PSScriptRoot 'tools\Get-ClientInfo.ps1'
 if ($ClientPath) { $found = & $infoScript -ClientPath $ClientPath | ConvertFrom-Json }
 else { $found = & $infoScript | ConvertFrom-Json }
 if ($found.discovered -ne 1) { throw 'NCM_INSTALLATION_NOT_UNIQUE_USE_CLIENTPATH' }
 $client = $found.clients[0]
-if ($client.version -ne '3.1.42.205594' -or $client.architecture -ne 'x64' -or -not $client.cefPresent -or -not $client.packagePresent -or
-    (Get-FileHash -LiteralPath $client.path -Algorithm SHA256).Hash -ine '1d593a307e074368cb9539d3aa86577231c8b53c6e966d43bf7661a25f165ad3') { throw 'NCM_STARTUP_CLIENT_UNVERIFIED' }
+if (-not $Uninstall) { $null = Assert-NcmOfficialClient $client.path }
 $installedPath = Join-Path (Split-Path $client.path -Parent) 'ncm-gapless\installation.json'
 $files = @('tools\AutoAttach-NcmGapless.ps1','tools\Ncm-StartupState.ps1','tools\Ncm-Cdp.ps1',
     'src\client-adapter.js','src\aac-timing.js','src\gapless-engine.js','src\netease-gapless.js','LICENSES\CEF.txt')

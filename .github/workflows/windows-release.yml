@@ -1,0 +1,51 @@
+name: Windows signed maintenance release
+on:
+  push:
+    tags: ['windows-release-v*']
+permissions:
+  contents: write
+concurrency:
+  group: windows-maintenance-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and verify
+        shell: powershell
+        run: |
+          & tools/build_windows_startup.ps1
+          & tests/windows-startup-native.test.ps1
+          & tests/windows-startup-attach.test.ps1
+          & tests/windows-maintenance.test.ps1
+          node --test tests/client-adapter.test.js tests/controller.test.cjs tests/aac-timing.test.cjs tests/verify-disable.test.js
+          if ($LASTEXITCODE) { throw 'JavaScript regressions failed' }
+      - name: Sign fixed payload
+        shell: powershell
+        env:
+          NCM_WINDOWS_RELEASE_KEY: ${{ secrets.NCM_WINDOWS_RELEASE_KEY }}
+        run: |
+          if (-not $env:NCM_WINDOWS_RELEASE_KEY) { throw 'Configure the repository release signing secret with explicit key-owner authorization; local signed publication remains available.' }
+          $sequence=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          $version=python -c "import sys;sys.path.insert(0,'tools');from build_portable import VERSION;print(VERSION)"
+          & tools/build_windows_release.ps1 -Sequence $sequence -Tag $env:GITHUB_REF_NAME -Version $version
+          python tools/build_portable.py --platform windows --windows-maintenance
+          if ($LASTEXITCODE) { throw 'Package build failed' }
+      - name: Publish version, then channel
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME artifacts/windows-maintenance/windows-payload.zip artifacts/windows-maintenance/windows-update.json artifacts/*-windows-maintenance.zip --prerelease --title $env:GITHUB_REF_NAME --notes 'Signed Windows maintenance payload. See docs/windows-maintenance.md for compatibility and recovery boundaries.'
+          if ($LASTEXITCODE) { throw 'Immutable release publication failed' }
+          gh release view windows-maintenance
+          if ($LASTEXITCODE) {
+            gh release create windows-maintenance --target $env:GITHUB_SHA --prerelease --title 'Windows maintenance channel' --notes 'Signed update index for Windows automatic maintenance.'
+            if ($LASTEXITCODE) { throw 'Channel creation failed' }
+          }
+          gh release upload windows-maintenance artifacts/windows-maintenance/windows-update.json --clobber
+          if ($LASTEXITCODE) { throw 'Channel update failed' }
