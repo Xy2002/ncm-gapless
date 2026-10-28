@@ -1,4 +1,5 @@
 """One-shot automation, cancellation and local import; never launches a client."""
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 from io import StringIO
 import json
@@ -35,8 +36,8 @@ class AutomationTests(unittest.TestCase):
         launcher.atomic_write(self.folder / "enabled.json", json.dumps(settings).encode())
         return settings
 
-    def run_main(self, action):
-        with patch.object(sys, "argv", ["macos_launcher.py", action]), patch.object(sys, "platform", "darwin"), redirect_stdout(StringIO()) as output:
+    def run_main(self, action, *arguments):
+        with patch.object(sys, "argv", ["macos_launcher.py", action, *arguments]), patch.object(sys, "platform", "darwin"), redirect_stdout(StringIO()) as output:
             launcher.main()
         return json.loads(output.getvalue())
 
@@ -145,11 +146,60 @@ class AutomationTests(unittest.TestCase):
             self.assertEqual(launcher.on_open(), {"busy": True})
             find.assert_not_called()
 
+    def test_stop_revokes_enablement_written_while_waiting_for_lock(self):
+        waiting = threading.Event()
+        operation = launcher.operation
+
+        def wait_for_lock():
+            waiting.set()
+            return operation()
+
+        with patch.object(launcher, "operation", side_effect=wait_for_lock), patch.object(launcher, "find_port", return_value=49321) as find, patch.object(launcher, "ensure_runtime"), patch.object(launcher, "uninstall_patch", return_value={"installed": False}), patch.object(launcher, "shortcut_installed", return_value=True):
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with operation():
+                    stopped = executor.submit(self.run_main, "disable")
+                    self.assertTrue(waiting.wait(2))
+                    self.enable()
+                    (self.folder / "on-open.command").touch()
+                report = stopped.result(timeout=2)
+            self.assertFalse(report["installed"])
+            self.assertFalse(report["automaticEnabled"])
+            self.assertIsNone(launcher.automation_settings())
+            self.assertFalse((self.folder / "on-open.command").exists())
+            find.assert_called_once_with(launch=False, client_path=self.app)
+            self.assertEqual(launcher.on_open(), {"automaticEnabled": False})
+
     def test_stop_uses_saved_client_before_removing_configuration(self):
         self.enable()
         with patch.object(launcher, "find_port", return_value=49321) as find, patch.object(launcher, "ensure_runtime"), patch.object(launcher, "uninstall_patch", return_value={"installed": False}):
             self.assertFalse(self.run_main("disable")["automaticEnabled"])
             find.assert_called_once_with(launch=False, client_path=self.app)
+
+    def test_stop_keeps_saved_client_path_after_runtime_reexecution(self):
+        self.app = self.folder / "Custom Apps/Music With Spaces.app"
+        python = self.folder / ".venv/bin/python3"
+        python.parent.mkdir(parents=True)
+        python.touch()
+
+        def find_port(*, launch, client_path):
+            self.assertEqual(client_path, self.app)
+            return 49321
+
+        with patch.object(launcher, "ROOT", self.folder), patch.object(launcher, "find_port", side_effect=find_port) as find, patch.object(launcher.subprocess, "run") as run, patch.object(launcher.os, "execv", side_effect=SystemExit) as execute, patch.object(launcher, "uninstall_patch", return_value={"installed": False}) as uninstall:
+            self.enable()
+            with patch.object(launcher.importlib, "import_module", side_effect=ImportError):
+                with self.assertRaises(SystemExit):
+                    self.run_main("disable")
+            self.assertIsNone(launcher.automation_settings())
+            uninstall.assert_not_called()
+            run.assert_not_called()
+            self.assertEqual(execute.call_args.args[0], str(python))
+            with patch.object(launcher.importlib, "import_module"):
+                report = self.run_main(*execute.call_args.args[1][2:])
+            self.assertFalse(report["installed"])
+            self.assertFalse(report["automaticEnabled"])
+            self.assertEqual(find.call_count, 2)
+            uninstall.assert_called_once_with(49321)
 
     def test_status_uses_saved_client_for_a_nonstandard_installation(self):
         self.enable()

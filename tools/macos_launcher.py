@@ -121,7 +121,7 @@ def automatic_status():
     return result
 
 
-def ensure_runtime():
+def ensure_runtime(*, client_path=None):
     try:
         importlib.import_module("websocket")
         return
@@ -130,6 +130,8 @@ def ensure_runtime():
     environment = ROOT / ".venv"
     python = environment / "bin/python3"
     command = [str(python), str(Path(__file__).resolve()), *sys.argv[1:]]
+    if client_path is not None:
+        command.extend(["--client-path", str(client_path)])
     if python.is_file() and Path(sys.prefix).resolve() != environment.resolve():
         return os.execv(str(python), command)
     print("首次运行：正在准备本目录的 Python 环境和 WebSocket 依赖。", file=sys.stderr, flush=True)
@@ -529,9 +531,18 @@ def main():
                 (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
         elif arguments.action == "status":
             settings = automation_settings()
-        if settings and arguments.client_path is None:
-            arguments.client_path = Path(settings["clientPath"])
         with operation():
+            if arguments.action == "disable":
+                # Enable may have written new state while Stop waited for the lock.
+                try:
+                    settings = automation_settings() or settings
+                except (OSError, RuntimeError):
+                    pass
+                finally:
+                    (AUTOMATION_DIR / "enabled.json").unlink(missing_ok=True)
+                    (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
+            if settings and arguments.client_path is None:
+                arguments.client_path = Path(settings["clientPath"])
             try:
                 port = find_port(launch=arguments.action == "install", client_path=arguments.client_path)
             except RuntimeError as error:
@@ -539,7 +550,7 @@ def main():
                     raise
                 report = {"installed": False, "running": bool(running_commands())}
             else:
-                ensure_runtime()
+                ensure_runtime(client_path=arguments.client_path)
                 if arguments.action == "install":
                     report = install_patch(port)
                 elif arguments.action == "status":
