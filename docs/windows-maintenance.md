@@ -45,3 +45,5 @@ python tools/build_portable.py --platform windows --windows-maintenance
 ```
 
 测试分开记录模拟版本变化、真实 Windows 加载器、受控签名更新、实机任务、实际网络下载和音频输出，不能相互替代。研究依据见 [Windows 维护研究](windows-maintenance-research.md)。
+
+本机验证记录见 [0.5 自动维护验收](evidence/windows-maintenance-v0.5.json)。该记录包括实际 SYSTEM 下载、等待退出、自动切换及重新打开后的摘要检查；没有把这些结果当作真实网易云升级或未来版本的音频验收。

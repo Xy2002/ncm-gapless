@@ -38,6 +38,7 @@ WINDOWS_MAINTENANCE_FILES = [
     'Install-NcmGaplessMaintenance.cmd', 'Install-NcmGaplessMaintenance.ps1', 'Uninstall-NcmGaplessMaintenance.cmd',
     'tools/Ncm-Maintenance.ps1', 'tools/Invoke-NcmMaintenance.ps1', 'tools/update-public-key.xml',
     'docs/windows-maintenance.md',
+    'docs/evidence/windows-maintenance-v0.5.json',
 ]
 
 
