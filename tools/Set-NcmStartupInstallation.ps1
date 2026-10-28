@@ -150,6 +150,7 @@ try {
             [IO.File]::WriteAllText($manifestSource, ($manifest | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
             Copy-NcmInstalledFile $manifestSource $manifestPath
             if ($RuntimeDigest) { Copy-NcmInstalledFile $pointerSource (Join-Path $runtime 'active.txt') }
+            elseif ($existing -and $existing.PSObject.Properties.Name -contains 'runtime') { [IO.File]::Delete((Join-Path $runtime 'active.txt')) }
             [IO.File]::Delete($retiredPath)
         } catch {
             # On a fresh installation, remove only bytes copied by this attempt.
@@ -164,7 +165,7 @@ try {
                     elseif ($copied.Contains($entry.Name)) { [IO.File]::Delete((Join-Path $directory $entry.Name)) }
                 }
                 [IO.File]::WriteAllText($manifestPath, ($existing | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
-                if ($RuntimeDigest) {
+                if ($RuntimeDigest -or $existing.PSObject.Properties.Name -contains 'runtime') {
                     if ($existing.PSObject.Properties.Name -contains 'runtime') { [IO.File]::WriteAllText((Join-Path $runtime 'active.txt'),$existing.runtime.digest,(New-Object Text.UTF8Encoding($false))) }
                     else { [IO.File]::Delete((Join-Path $runtime 'active.txt')) }
                 }

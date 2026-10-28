@@ -65,6 +65,10 @@ try {
         if ($health) {
             $identity="$($health.processId):$($health.startedFileTime)"
             if ($health.result -ceq 'installed') { $state | Add-Member -NotePropertyName failureCount -NotePropertyValue 0 -Force }
+            elseif ($health.PSObject.Properties.Name -contains 'failedInstances' -and @($health.failedInstances).Count -le 8) {
+                $failures=@($health.failedInstances | Where-Object { $_ -cmatch '^\d{1,10}:\d{1,20}$' } | Select-Object -Unique)
+                $state | Add-Member -NotePropertyName failureCount -NotePropertyValue $failures.Count -Force
+            }
             elseif ($health.result -ceq 'failed' -and $health.error -notmatch 'CLIENT_|CANCELLED' -and
                 ($state.PSObject.Properties.Name -notcontains 'lastFailure' -or $state.lastFailure -cne $identity)) {
                 $count=$(if ($state.PSObject.Properties.Name -contains 'failureCount') { [int]$state.failureCount } else { 0 })
@@ -168,11 +172,9 @@ try {
 } catch {
     $receipt.result = 'failed'; $receipt.error = 'NCM_MAINTENANCE_FAILED'
     if ($_.ToString() -match '(NCM_[A-Z_]+)') { $receipt.error = $Matches[1] }
-    if ($pending -and $release.digest -cne $active.digest) {
-        $state | Add-Member -NotePropertyName rejectedDigest -NotePropertyValue $release.digest -Force
-        Write-NcmMaintenanceJson $statePath $state
-        [IO.File]::Delete((Join-Path $root 'pending.json'))
-    }
+    # Installation races/transient write failures do not prove a bad release.
+    # Keep the signed pending payload for the next closed-client retry.
+    if ($receipt.error -ceq 'NCM_EXIT_CLIENT_BEFORE_STARTUP_INSTALL') { $receipt.result='deferred-client-running' }
 } finally {
     try { Write-NcmMaintenanceJson (Join-Path $root 'status.json') $receipt } finally { $lock.Dispose() }
 }

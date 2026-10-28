@@ -2,7 +2,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repository = Split-Path $PSScriptRoot -Parent
-$fixture = Join-Path $repository ('.local\windows-startup-attach-' + [Guid]::NewGuid().ToString('N'))
+$base = Join-Path $repository ('.local\windows-startup-attach-' + [Guid]::NewGuid().ToString('N'))
+$fixture = Join-Path $base ('c'*64)
 $toolsDirectory = Join-Path $fixture 'tools'
 [void][IO.Directory]::CreateDirectory($toolsDirectory)
 [void][IO.Directory]::CreateDirectory((Join-Path $fixture 'src'))
@@ -31,6 +32,7 @@ function Invoke-NcmExpression {
         return [PSCustomObject]@{ready=$true;error=$null;documentState='interactive'}
     }
     if ($env:NCM_TEST_CASE -eq 'unsupported') { throw 'CLIENT_VERSION_UNVERIFIED' }
+    if ($env:NCM_TEST_CASE -eq 'attach-failure') { throw 'NCM_STARTUP_ATTACH_FAILED' }
     [IO.File]::AppendAllText((Join-Path $env:LOCALAPPDATA 'injections.txt'), "injected`n")
     [PSCustomObject]@{installed=$true}
 }
@@ -74,3 +76,34 @@ foreach ($case in $cases) {
     Write-Host "PASS startup attach $($case.name)"
 }
 Write-Host "$($cases.Count) real PowerShell attach lifecycle checks passed. No real client or network was used."
+$userProfile=Join-Path $base 'rapid-user'
+$profile=Join-Path $userProfile 'AppData\Local'
+$state=Join-Path $profile 'NCMGapless\startup'
+[void][IO.Directory]::CreateDirectory($state)
+[IO.File]::WriteAllText((Join-Path $state 'enabled.txt'),"NCMG1`n0123456789abcdef0123456789abcdef`n$client`n",(New-Object Text.UTF8Encoding($false)))
+$start.EnvironmentVariables['LOCALAPPDATA']=$profile
+$start.EnvironmentVariables['NCM_TEST_CASE']='attach-failure'
+function Run-RapidAttach {
+    $started=[DateTime]::UtcNow.ToFileTimeUtc().ToString()
+    $start.EnvironmentVariables['NCM_TEST_STARTED']=$started
+    $start.Arguments='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Port 49321 -ClientProcessId 42 -StartedFileTime {1} -Token 0123456789abcdef0123456789abcdef -StartupTimeoutSeconds 1' -f (Join-Path $toolsDirectory 'AutoAttach-NcmGapless.ps1'),$started
+    $process=[Diagnostics.Process]::Start($start)
+    $output=$process.StandardOutput.ReadToEnd();$errors=$process.StandardError.ReadToEnd();$process.WaitForExit()
+    if ($process.ExitCode) { throw "RAPID_ATTACH_FAILED: $output $errors" }
+}
+for ($i=0;$i -lt 3;$i++) { Run-RapidAttach }
+$health=Get-Content -LiteralPath (Join-Path $state 'attach-health.json') -Raw|ConvertFrom-Json
+if (@($health.failedInstances).Count -ne 3) { throw 'RAPID_START_FAILURES_LOST' }
+. (Join-Path $repository 'tools\Ncm-Maintenance.ps1')
+function Get-CimInstance { param($ClassName,$Filter) return [PSCustomObject]@{LocalPath=$userProfile} }
+$collected=Get-NcmActivationHealth $client ('c'*64)
+if (@($collected.failedInstances).Count -ne 3) { throw 'MAINTENANCE_DID_NOT_COLLECT_RAPID_FAILURES' }
+Write-Host 'PASS three failed starts are durable before any maintenance poll'
+$start.EnvironmentVariables['NCM_TEST_CASE']='ready';Run-RapidAttach
+$health=Get-Content -LiteralPath (Join-Path $state 'attach-health.json') -Raw|ConvertFrom-Json
+if (@($health.failedInstances).Count -ne 0) { throw 'SUCCESS_DID_NOT_RESET_FAILURE_HISTORY' }
+$start.EnvironmentVariables['NCM_TEST_CASE']='attach-failure';Run-RapidAttach
+$health=Get-Content -LiteralPath (Join-Path $state 'attach-health.json') -Raw|ConvertFrom-Json
+if (@($health.failedInstances).Count -ne 1) { throw 'FAILURE_HISTORY_NOT_CONSECUTIVE' }
+Write-Host 'PASS successful attach resets the consecutive failure history'
+Write-Host '2 rapid-start health checks passed using the real helper and collector.'

@@ -100,3 +100,25 @@ function Get-NcmStartupStatus {
     }
     return [PSCustomObject]@{ automaticEnabled = [bool]$enabled; automaticLastResult = $result; automaticLastError = $errorCode }
 }
+function Write-NcmStartupHealth {
+    param($Receipt)
+    if ($Receipt.runtimeDigest -cnotmatch '^[0-9a-f]{64}$' -or $Receipt.result -notin @('installed','failed')) { return }
+    if ($Receipt.result -ceq 'failed' -and $Receipt.error -match 'CLIENT_|CANCELLED') { return }
+    $failed=@()
+    $path=Join-Path (Get-NcmStartupStateDirectory) 'attach-health.json'
+    try {
+        if ([IO.File]::Exists($path) -and (Get-Item -LiteralPath $path).Length -le 32768) {
+            $previous=Read-NcmStartupText $path|ConvertFrom-Json
+            if ($previous.runtimeDigest -ceq $Receipt.runtimeDigest -and $previous.token -ceq $Receipt.token -and $previous.clientPath -ieq $Receipt.clientPath) {
+                $failed=@($previous.failedInstances|Where-Object {$_ -cmatch '^\d{1,10}:\d{1,20}$'})
+            }
+        }
+    } catch { $failed=@() }
+    if ($Receipt.result -ceq 'installed') { $failed=@() }
+    else { $failed=@(($failed+"$($Receipt.processId):$($Receipt.startedFileTime)")|Select-Object -Unique|Select-Object -Last 8) }
+    # Caller holds operation.lock. Preserve distinct failures even when several
+    # launches complete before the next maintenance poll; bound user data size.
+    $health=[ordered]@{token=$Receipt.token;clientPath=$Receipt.clientPath;runtimeDigest=$Receipt.runtimeDigest;
+        processId=$Receipt.processId;startedFileTime=$Receipt.startedFileTime;result=$Receipt.result;error=$Receipt.error;failedInstances=$failed}
+    Write-NcmStartupText 'attach-health.json' ($health|ConvertTo-Json -Depth 5)
+}

@@ -21,7 +21,9 @@ jobs:
           & tools/build_windows_startup.ps1
           & tests/windows-startup-native.test.ps1
           & tests/windows-startup-attach.test.ps1
+          & tests/windows-startup-reenable.test.ps1
           & tests/windows-maintenance.test.ps1
+          & tests/windows-permissions.test.ps1
           & tests/windows-download.test.ps1
           node --test tests/client-adapter.test.js tests/controller.test.cjs tests/aac-timing.test.cjs tests/verify-disable.test.js
           if ($LASTEXITCODE) { throw 'JavaScript regressions failed' }

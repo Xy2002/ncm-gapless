@@ -1,0 +1,30 @@
+name: Windows patch checks
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: windows-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-check:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and check patch lifecycle
+        shell: powershell
+        run: |
+          & tools/build_windows_startup.ps1
+          & tests/windows-startup-native.test.ps1
+          & tests/windows-startup-attach.test.ps1
+          & tests/windows-startup-reenable.test.ps1
+          & tests/windows-maintenance.test.ps1
+          & tests/windows-permissions.test.ps1
+          & tests/windows-download.test.ps1
+          node --test tests/client-adapter.test.js tests/controller.test.cjs tests/aac-timing.test.cjs tests/verify-disable.test.js
+          if ($LASTEXITCODE) { throw 'JavaScript regressions failed' }
+          python -m unittest discover -s tests -p test_build_portable.py
+          if ($LASTEXITCODE) { throw 'Portable package checks failed' }

@@ -48,12 +48,22 @@ try {
     $mocks=@'
 function Assert-NcmOfficialClient($ClientPath) { return @{path=$ClientPath;version='3.2.0.999999'} }
 function Assert-NcmAdminDirectory($Path) {}
-function Get-CimInstance { param($ClassName,$Filter) if ($env:NCM_FIXTURE_RUNNING -eq '1') { return @{ExecutablePath=$env:NCM_FIXTURE_CLIENT} } }
+function Get-CimInstance {
+    param($ClassName,$Filter)
+    if ($ClassName -ne 'Win32_Process') { return }
+    if ($env:NCM_FIXTURE_LAUNCH_RACE) {
+        if ([IO.File]::Exists($env:NCM_FIXTURE_LAUNCH_RACE)) { return @{ExecutablePath=$env:NCM_FIXTURE_CLIENT} }
+        [IO.File]::WriteAllText($env:NCM_FIXTURE_LAUNCH_RACE,'client starts after first query')
+        return
+    }
+    if ($env:NCM_FIXTURE_RUNNING -eq '1') { return @{ExecutablePath=$env:NCM_FIXTURE_CLIENT} }
+}
 function Get-NcmHttpsBytes($Url,$MaximumBytes) {
     if ($env:NCM_FIXTURE_OFFLINE -eq '1') { throw 'NCM_FIXTURE_OFFLINE' }
     return ,[IO.File]::ReadAllBytes((Join-Path $env:NCM_FIXTURE_FEED $(if ($Url.EndsWith('.json')) {'feed.json'}else{'feed.zip'})))
 }
 function Get-NcmActivationHealth($ClientPath,$Digest) {
+    if ($env:NCM_FIXTURE_RAPID -eq '1') { return [PSCustomObject]@{clientPath=$ClientPath;runtimeDigest=$Digest;processId=3;startedFileTime='1';result='failed';error='NCM_STARTUP_ATTACH_FAILED';failedInstances=@('1:1','2:1','3:1')} }
     if ($env:NCM_FIXTURE_FAILURE) { return @{clientPath=$ClientPath;runtimeDigest=$Digest;processId=[int]$env:NCM_FIXTURE_FAILURE;startedFileTime='1';result='failed';error='NCM_STARTUP_ATTACH_FAILED'} }
 }
 '@
@@ -94,6 +104,13 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     $counter|Add-Member -NotePropertyName failureDigest -NotePropertyValue $first.release.digest -Force
     Write-NcmMaintenanceJson (Join-Path $root 'state.json') $counter
     $second=Make-Release 101 'second'; Publish $second
+    $env:NCM_FIXTURE_LAUNCH_RACE=Join-Path $fixture 'launch-race.txt'
+    $status=Run-Worker
+    $raceState=Get-Content -LiteralPath (Join-Path $root 'state.json') -Raw|ConvertFrom-Json
+    if ($status.result -cne 'deferred-client-running' -or -not [IO.File]::Exists((Join-Path $root 'pending.json')) -or
+        ($raceState.PSObject.Properties.Name -contains 'rejectedDigest' -and $raceState.rejectedDigest -ceq $second.release.digest)) { throw 'LAUNCH_RACE_QUARANTINED_VALID_UPDATE' }
+    $env:NCM_FIXTURE_LAUNCH_RACE=$null
+    Write-Host 'PASS late client startup retains the signed pending release for retry'
     $status=Run-Worker
     if ($status.result -cne 'updated' -or (Get-Content -LiteralPath (Join-Path $root 'active.json') -Raw|ConvertFrom-Json).digest -cne $second.release.digest) { throw ($status|ConvertTo-Json) }
     if ((Get-Content -LiteralPath (Join-Path $root 'previous.json') -Raw|ConvertFrom-Json).digest -cne $first.release.digest) { throw 'PREVIOUS_MISSING' }
@@ -123,6 +140,12 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     $status=Run-Worker
     if ($status.result -cne 'repaired' -or $status.error -cne 'NCM_UPDATE_PENDING_REJECTED') { throw ($status|ConvertTo-Json) }
     Write-Host 'PASS stale pending and failed newer download do not block cached active repair'
+    $fourth=Make-Release 103 'rapid-health';Publish $fourth
+    $status=Run-Worker
+    if ($status.result -cne 'updated') { throw 'RAPID_ROLLBACK_SETUP_FAILED' }
+    $env:NCM_FIXTURE_RAPID='1';$status=Run-Worker;$env:NCM_FIXTURE_RAPID=$null
+    if ($status.result -cne 'rolled-back') { throw 'RAPID_FAILURES_REQUIRE_EXTRA_MAINTENANCE_POLLS' }
+    Write-Host 'PASS one maintenance poll consumes three distinct durable failed starts'
     Publish $first
     $status=Run-Worker
     if ($status.error -cne 'NCM_UPDATE_ROLLBACK_REJECTED' -or $status.result -cne 'healthy') { throw ($status|ConvertTo-Json) }
@@ -146,8 +169,8 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Set-NcmStartupInstallation.ps1') -ClientPath $client -Payload $stage -ResultPath (Join-Path $stage 'result.json') -Repair -RuntimeDigest $first.release.digest
     if ($LASTEXITCODE) { throw 'VERSIONED_REINSTALL_FAILED' }
     Write-Host 'PASS versioned physical uninstall and reinstall preserve old caches without blocking installation'
-    Write-Host '16 maintenance security and worker checks passed; no real client, scheduled task or network used.'
+    Write-Host '18 maintenance security and worker checks passed; no real client, scheduled task or network used.'
 } finally {
     $rsa.Dispose()
-    foreach ($name in @('NCM_FIXTURE_RUNNING','NCM_FIXTURE_OFFLINE','NCM_FIXTURE_FEED','NCM_FIXTURE_CLIENT','NCM_FIXTURE_FAILURE')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
+    foreach ($name in @('NCM_FIXTURE_RUNNING','NCM_FIXTURE_OFFLINE','NCM_FIXTURE_FEED','NCM_FIXTURE_CLIENT','NCM_FIXTURE_FAILURE','NCM_FIXTURE_LAUNCH_RACE','NCM_FIXTURE_RAPID')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
 }

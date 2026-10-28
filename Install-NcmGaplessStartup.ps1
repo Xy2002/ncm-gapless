@@ -26,13 +26,25 @@ if (-not $Uninstall) {
     foreach ($name in $files) { $expected[('ncm-gapless\' + $name)] = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $matches = $false
+$repairVersioned = $false
 if (-not $Uninstall -and (Test-Path -LiteralPath $installedPath)) {
     $installed = [IO.File]::ReadAllText($installedPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     $matches = $installed.owner -ceq 'ncm-gapless-windows-startup-v1'
+    $repairVersioned = $installed.PSObject.Properties.Name -contains 'runtime'
+    if ($repairVersioned) {
+        if ($installed.runtime.digest -cnotmatch '^[0-9a-f]{64}$') { throw 'NCM_STARTUP_MANIFEST_INVALID' }
+        $pointer = Join-Path (Split-Path $installedPath -Parent) 'active.txt'
+        if (-not [IO.File]::Exists($pointer) -or [IO.File]::ReadAllText($pointer) -cne $installed.runtime.digest) { $matches=$false }
+    }
     foreach ($name in $expected.Keys) {
         $path = Join-Path (Split-Path $client.path -Parent) $name
-        if ($installed.sha256.PSObject.Properties.Name -cnotcontains $name -or
-            $installed.sha256.$name -cne $expected[$name] -or -not (Test-Path -LiteralPath $path) -or
+        $hashes=$installed.sha256; $key=$name
+        if ($repairVersioned -and $name.StartsWith('ncm-gapless\',[StringComparison]::Ordinal)) {
+            $key=$name.Substring(12); $hashes=$installed.runtime.sha256
+            $path=Join-Path (Split-Path $installedPath -Parent) ("versions\$($installed.runtime.digest)\$key")
+        }
+        if ($hashes.PSObject.Properties.Name -cnotcontains $key -or
+            $hashes.$key -cne $expected[$name] -or -not (Test-Path -LiteralPath $path) -or
             (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $expected[$name]) { $matches = $false }
     }
     $drawing = Join-Path (Split-Path $client.path -Parent) 'ncm_gapless_msimg32.dll'
@@ -60,10 +72,11 @@ if (-not $matches) {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        & $fileScript -ClientPath $client.path -Payload $stage -ResultPath $resultPath -Action $action
+        & $fileScript -ClientPath $client.path -Payload $stage -ResultPath $resultPath -Action $action -Repair:$repairVersioned
     } else {
         $powershell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $arguments = '-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -ClientPath "{1}" -Payload "{2}" -ResultPath "{3}" -Action {4}' -f $fileScript,$client.path,$stage,$resultPath,$action
+        if ($repairVersioned) { $arguments += ' -Repair' }
         $child = Start-Process -FilePath $powershell -Verb RunAs -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
     }
     if (-not (Test-Path -LiteralPath $resultPath)) { throw 'NCM_STARTUP_INSTALLATION_NO_RECEIPT' }

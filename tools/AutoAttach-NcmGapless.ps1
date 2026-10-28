@@ -56,7 +56,10 @@ try {
     $receipt.error = $(if ($match.Success) { $match.Value } else { 'NCM_STARTUP_ATTACH_FAILED' })
 } finally {
     if ($operation) {
-        try { Write-NcmStartupText 'attach.json' ($receipt | ConvertTo-Json -Depth 4) }
+        try {
+            Write-NcmStartupText 'attach.json' ($receipt | ConvertTo-Json -Depth 4)
+            Write-NcmStartupHealth $receipt
+        }
         finally { $operation.Dispose() }
     }
 }

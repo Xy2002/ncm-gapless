@@ -126,12 +126,14 @@ function Assert-NcmAdminDirectory {
         foreach ($rule in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
             if ($rule.AccessControlType -ne 'Allow' -or ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly)) { continue }
             $sid = $rule.IdentityReference.Value
-            $write = [long]$rule.FileSystemRights -band 0x500d0156
+            # Creating unrelated children at a volume root does not permit replacing
+            # an existing protected tree. DELETE_CHILD and ACL/owner changes do.
+            $mask = $(if (-not $item.Parent) { 0x500d0150 } else { 0x500d0156 })
+            $write = [long]$rule.FileSystemRights -band $mask
             if ($write -and $sid -notin $trusted) { throw 'NCM_MAINTENANCE_TARGET_USER_WRITABLE' }
         }
-        # The system volume root permits creation of unrelated children; do not treat that as permission on this tree.
         $parent = $item.Parent
-        if (-not $parent -or -not $parent.Parent) { break }
+        if (-not $parent) { break }
         $item = $parent
     }
 }
@@ -160,7 +162,8 @@ function Get-NcmActivationHealth {
     param([string]$ClientPath,[string]$Digest)
     $latest=$null; $latestTime=[DateTime]::MinValue
     foreach ($profile in @(Get-CimInstance Win32_UserProfile -Filter 'Special=False')) {
-        $path=Join-Path $profile.LocalPath 'AppData\Local\NCMGapless\startup\attach.json'
+        $path=Join-Path $profile.LocalPath 'AppData\Local\NCMGapless\startup\attach-health.json'
+        if (-not [IO.File]::Exists($path)) { $path=Join-Path $profile.LocalPath 'AppData\Local\NCMGapless\startup\attach.json' }
         if (-not [IO.File]::Exists($path)) { continue }
         $value=Read-NcmSmallJson $path
         if (-not $value -or $value.PSObject.Properties.Name -notcontains 'runtimeDigest' -or $value.runtimeDigest -cne $Digest -or $value.clientPath -ine $ClientPath) { continue }
