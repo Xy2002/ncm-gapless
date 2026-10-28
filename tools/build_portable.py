@@ -39,6 +39,7 @@ WINDOWS_MAINTENANCE_FILES = [
     'tools/Ncm-Maintenance.ps1', 'tools/Invoke-NcmMaintenance.ps1', 'tools/update-public-key.xml',
     'docs/windows-maintenance.md',
     'docs/evidence/windows-maintenance-v0.5.json',
+    'docs/evidence/windows-ci-release-v0.5.json',
 ]
 
 

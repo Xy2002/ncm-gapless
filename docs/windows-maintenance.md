@@ -47,3 +47,5 @@ python tools/build_portable.py --platform windows --windows-maintenance
 测试分开记录模拟版本变化、真实 Windows 加载器、受控签名更新、实机任务、实际网络下载和音频输出，不能相互替代。研究依据见 [Windows 维护研究](windows-maintenance-research.md)。
 
 本机验证记录见 [0.5 自动维护验收](evidence/windows-maintenance-v0.5.json)。该记录包括实际 SYSTEM 下载、等待退出、自动切换及重新打开后的摘要检查；没有把这些结果当作真实网易云升级或未来版本的音频验收。
+
+签名密钥经所有者明确授权后已配置到仓库 Actions Secret。首次 [CI 自动发布](https://github.com/Xy2002/ncm-gapless/actions/runs/40649332347) 已完成构建、检查、签名和通道更新，并由本机 SYSTEM 任务下载、验签及安装，普通启动加载成功。详见 [CI 发布验收](evidence/windows-ci-release-v0.5.json)；前一份本机记录保留授权前的历史状态。此流程由 `windows-release-v*` 标签触发，首次验证不代表今后每个新客户端版本均已兼容。

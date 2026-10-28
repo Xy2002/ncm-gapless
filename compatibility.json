@@ -138,6 +138,13 @@
     "activationFailureRollback": "three distinct helper failure receipts; no coverage before helper receipt",
     "repairBoundary": "same approved admin-protected installation path",
     "updateChannel": "https://github.com/Xy2002/ncm-gapless/releases/tag/windows-maintenance",
-    "documentation": "docs/windows-maintenance.md"
+    "documentation": "docs/windows-maintenance.md",
+    "ciPublication": {
+      "status": "verified-real-ci-and-local-install",
+      "triggerTags": "windows-release-v*",
+      "secretConfigured": true,
+      "runUrl": "https://github.com/Xy2002/ncm-gapless/actions/runs/40649332347",
+      "evidence": "docs/evidence/windows-ci-release-v0.5.json"
+    }
   }
 }
