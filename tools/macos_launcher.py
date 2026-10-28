@@ -361,16 +361,14 @@ def enable_automatic(app):
                         print("如需恢复官方播放，请运行 Stop-NcmGapless.command。", file=sys.stderr)
             raise
     return {"port": port, **report, "automaticEnabled": True, "shortcutImported": imported,
-            "shortcutImportRequired": not imported}
+            "shortcutImportRequired": not imported}, settings
 
 
 def on_open():
     settings = automation_settings()
     if not settings:
         return {"automaticEnabled": False}
-    with operation(wait=False) as acquired:
-        if not acquired:
-            return {"busy": True}
+    with operation():
         report = {"installed": False}
         error_code = None
         try:
@@ -466,11 +464,9 @@ def rollback_setup(settings):
 
 
 def setup_automatic(app):
-    report = enable_automatic(app)
-    settings = automation_settings()
-    if not settings:
-        raise RuntimeError("NCM_AUTO_ENABLE_CANCELLED")
+    report, settings = enable_automatic(app)
     try:
+        check_automation(settings)
         if not report["shortcutImported"]:
             if not sys.stdin.isatty():
                 raise RuntimeError("NCM_SETUP_REQUIRES_TERMINAL")
@@ -518,7 +514,10 @@ def main():
             raise RuntimeError("NCM_AUTOMATION_REQUIRES_MACOS_27")
         ensure_runtime()
         app = find_client(arguments.client_path)
-        report = setup_automatic(app) if arguments.action == "setup" else enable_automatic(app)
+        if arguments.action == "setup":
+            report = setup_automatic(app)
+        else:
+            report, _ = enable_automatic(app)
     else:
         settings = None
         if arguments.action == "disable":

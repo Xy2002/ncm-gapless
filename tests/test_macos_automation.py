@@ -140,11 +140,57 @@ class AutomationTests(unittest.TestCase):
             self.assertFalse(result[0]["automaticEnabled"])
             runtime.assert_not_called()
 
-    def test_duplicate_event_does_no_work(self):
+    def test_queued_duplicate_event_skips_an_installed_patch(self):
         self.enable()
-        with launcher.operation(), patch.object(launcher, "find_port") as find:
-            self.assertEqual(launcher.on_open(), {"busy": True})
+        with patch.object(launcher, "find_port", return_value=49321), patch.object(launcher.importlib, "import_module"), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "install_patch") as install:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with launcher.operation():
+                    event = executor.submit(launcher.on_open)
+                    with self.assertRaises(TimeoutError):
+                        event.result(timeout=.1)
+                self.assertTrue(event.result(timeout=2)["installed"])
+            install.assert_not_called()
+
+    def test_launch_event_waits_for_a_status_query_then_installs(self):
+        self.enable()
+        held, release = threading.Event(), threading.Event()
+
+        def status_value(*args):
+            if not held.is_set():
+                held.set()
+                if not release.wait(3):
+                    raise TimeoutError("status query did not finish")
+            return {"installed": False}
+
+        with patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "ensure_runtime"), patch.object(launcher.importlib, "import_module"), patch.object(launcher, "value", side_effect=status_value), patch.object(launcher, "shortcut_installed", return_value=True), patch.object(launcher, "install_patch", return_value={"installed": True}) as install:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                status = executor.submit(self.run_main, "status")
+                try:
+                    self.assertTrue(held.wait(2))
+                    event = executor.submit(launcher.on_open)
+                    with self.assertRaises(TimeoutError):
+                        event.result(timeout=.1)
+                finally:
+                    release.set()
+                self.assertFalse(status.result(timeout=2)["installed"])
+                self.assertTrue(event.result(timeout=2)["installed"])
+            install.assert_called_once_with(49321, check=ANY)
+        last = json.loads((self.folder / "last-run.json").read_text())
+        self.assertTrue(last["installed"])
+        self.assertIsNone(last["error"])
+
+    def test_queued_launch_event_rechecks_stop_before_client_access(self):
+        self.enable()
+        with patch.object(launcher, "find_port") as find:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with launcher.operation():
+                    event = executor.submit(launcher.on_open)
+                    with self.assertRaises(TimeoutError):
+                        event.result(timeout=.1)
+                    (self.folder / "enabled.json").unlink()
+                self.assertEqual(event.result(timeout=2), {"installed": False})
             find.assert_not_called()
+        self.assertFalse((self.folder / "last-run.json").exists())
 
     def test_stop_revokes_enablement_written_while_waiting_for_lock(self):
         waiting = threading.Event()
@@ -215,10 +261,19 @@ class AutomationTests(unittest.TestCase):
         self.assertFalse((self.folder / "enabled.json").exists())
         self.assertFalse((self.folder / "on-open.command").exists())
 
+    def test_enable_command_reports_status_without_private_settings(self):
+        with patch.object(launcher.platform, "mac_ver", return_value=("27.0", ("", "", ""), "arm64")), patch.object(launcher, "ensure_runtime"), patch.object(launcher, "find_client", return_value=self.app), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "prepare_shortcut", return_value=True):
+            report = self.run_main("enable")
+        self.assertTrue(report["automaticEnabled"])
+        self.assertNotIn("token", report)
+        self.assertNotIn("clientPath", report)
+
     def test_enable_writes_a_private_quoted_entry_and_cleans_up_failed_setup(self):
         python = "/tmp/Python space's $() directory/python3"
         with patch.object(launcher.sys, "executable", python), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "prepare_shortcut", return_value=True):
-            self.assertTrue(launcher.enable_automatic(self.app)["automaticEnabled"])
+            report, settings = launcher.enable_automatic(self.app)
+            self.assertTrue(report["automaticEnabled"])
+            self.assertEqual(launcher.automation_settings(), settings)
         entry = self.folder / "on-open.command"
         self.assertEqual(entry.stat().st_mode & 0o777, 0o700)
         self.assertEqual(shlex.split(entry.read_text().splitlines()[1]), ["exec", python, str(Path(launcher.__file__).resolve()), "on-open"])
@@ -282,8 +337,8 @@ class AutomationTests(unittest.TestCase):
                 launcher.verify_automatic(settings, self.app)
 
     def test_existing_setup_skips_questions_and_reports_the_new_port(self):
-        self.enable()
-        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True, "port": 9222}), patch.object(launcher, "verify_automatic", return_value={"port": 49321, "installed": True}), patch.object(launcher, "prompt_configuration") as prompt:
+        settings = self.enable()
+        with patch.object(launcher, "enable_automatic", return_value=({"shortcutImported": True, "port": 9222}, settings)), patch.object(launcher, "verify_automatic", return_value={"port": 49321, "installed": True}), patch.object(launcher, "prompt_configuration") as prompt:
             report = launcher.setup_automatic(self.app)
             self.assertTrue(report["setupVerified"])
             self.assertEqual(report["port"], 49321)
@@ -296,11 +351,28 @@ class AutomationTests(unittest.TestCase):
             uninstall.assert_called_once_with(49321)
         self.assertIsNone(launcher.automation_settings())
 
+    def test_failed_setup_does_not_adopt_a_newer_enablement(self):
+        enable = launcher.enable_automatic
+        newer = []
+
+        def overlapping_enable(app):
+            first = enable(app)
+            enable(app)
+            newer.append(launcher.automation_settings())
+            return first
+
+        with patch.object(launcher, "enable_automatic", side_effect=overlapping_enable), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "prepare_shortcut", return_value=True), patch.object(launcher, "verify_automatic", side_effect=RuntimeError("NCM_SETUP_CANCELLED")), patch.object(launcher, "uninstall_patch") as uninstall:
+            with self.assertRaisesRegex(RuntimeError, "NCM_(SETUP|AUTO_ENABLE)_CANCELLED"):
+                launcher.setup_automatic(self.app)
+            uninstall.assert_not_called()
+            self.assertEqual(launcher.automation_settings(), newer[0])
+            self.assertTrue((self.folder / "on-open.command").exists())
+
     def test_fresh_setup_waits_for_import_then_verifies(self):
-        self.enable()
+        settings = self.enable()
         terminal = Mock()
         terminal.isatty.return_value = True
-        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value={"shortcutImported": False}), patch.object(launcher, "shortcut_installed", side_effect=[False, True]), patch.object(launcher.time, "sleep"), patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "verify_automatic", return_value={"installed": True}) as verify:
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value=({"shortcutImported": False}, settings)), patch.object(launcher, "shortcut_installed", side_effect=[False, True]), patch.object(launcher.time, "sleep"), patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "verify_automatic", return_value={"installed": True}) as verify:
             self.assertTrue(launcher.setup_automatic(self.app)["setupVerified"])
             prompt.assert_called_once()
             verify.assert_called_once()
@@ -309,7 +381,7 @@ class AutomationTests(unittest.TestCase):
         settings = self.enable()
         terminal = Mock()
         terminal.isatty.return_value = True
-        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value={"shortcutImported": False}), patch.object(launcher, "shortcut_installed", return_value=True), patch.object(launcher, "prompt_configuration", side_effect=RuntimeError("NCM_SETUP_CANCELLED")), patch.object(launcher, "verify_automatic") as verify, patch.object(launcher, "rollback_setup") as rollback:
+        with patch.object(launcher.sys, "stdin", terminal), patch.object(launcher, "enable_automatic", return_value=({"shortcutImported": False}, settings)), patch.object(launcher, "shortcut_installed", return_value=True), patch.object(launcher, "prompt_configuration", side_effect=RuntimeError("NCM_SETUP_CANCELLED")), patch.object(launcher, "verify_automatic") as verify, patch.object(launcher, "rollback_setup") as rollback:
             with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_CANCELLED"):
                 launcher.setup_automatic(self.app)
             verify.assert_not_called()
@@ -317,14 +389,14 @@ class AutomationTests(unittest.TestCase):
 
     def test_setup_keyboard_interrupt_also_rolls_back(self):
         settings = self.enable()
-        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True}), patch.object(launcher, "verify_automatic", side_effect=KeyboardInterrupt), patch.object(launcher, "rollback_setup") as rollback:
+        with patch.object(launcher, "enable_automatic", return_value=({"shortcutImported": True}, settings)), patch.object(launcher, "verify_automatic", side_effect=KeyboardInterrupt), patch.object(launcher, "rollback_setup") as rollback:
             with self.assertRaises(KeyboardInterrupt):
                 launcher.setup_automatic(self.app)
             rollback.assert_called_once_with(settings)
 
     def test_setup_retries_only_after_confirmation_and_stops_after_three_attempts(self):
-        self.enable()
-        with patch.object(launcher, "enable_automatic", return_value={"shortcutImported": True}), patch.object(launcher, "verify_automatic", side_effect=RuntimeError("NCM_SETUP_NOT_READY")) as verify, patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "rollback_setup") as rollback:
+        settings = self.enable()
+        with patch.object(launcher, "enable_automatic", return_value=({"shortcutImported": True}, settings)), patch.object(launcher, "verify_automatic", side_effect=RuntimeError("NCM_SETUP_NOT_READY")) as verify, patch.object(launcher, "prompt_configuration") as prompt, patch.object(launcher, "rollback_setup") as rollback:
             with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_NOT_READY"):
                 launcher.setup_automatic(self.app)
             self.assertEqual(verify.call_count, 3)
