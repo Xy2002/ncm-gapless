@@ -80,12 +80,13 @@ function Read-NcmReleasePayload {
     } finally { $archive.Dispose(); $stream.Dispose() }
     return $files
 }
-function Get-NcmHttpsBytes {
-    param([string]$Url,[int]$MaximumBytes)
+function Get-NcmRawHttpsBytes {
+    param([string]$Url,[int]$MaximumBytes,[string]$Accept)
     if (-not $Url.StartsWith('https://',[StringComparison]::Ordinal)) { throw 'NCM_UPDATE_HTTPS_REQUIRED' }
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::SystemDefault
     $request = [Net.HttpWebRequest]::Create($Url)
     $request.Timeout = 15000; $request.ReadWriteTimeout = 15000; $request.UserAgent = 'NCMGapless-Maintenance/1'
+    if ($Accept) { $request.Accept=$Accept }
     $response = $request.GetResponse()
     $outputStream = New-Object IO.MemoryStream
     try {
@@ -98,6 +99,21 @@ function Get-NcmHttpsBytes {
         }
         return ,$outputStream.ToArray()
     } finally { $outputStream.Dispose(); $response.Dispose() }
+}
+function Get-NcmHttpsBytes {
+    param([string]$Url,[int]$MaximumBytes)
+    try { return ,(Get-NcmRawHttpsBytes $Url $MaximumBytes) }
+    catch {
+        # Official asset API fallback avoids blocked github.com front-end downloads.
+        # API metadata remains untrusted; the caller still verifies signature/hash.
+        if ($Url -cnotmatch '^https://github\.com/Xy2002/ncm-gapless/releases/download/([a-zA-Z0-9._-]+)/([a-zA-Z0-9._-]+)$') { throw }
+        $tag=$Matches[1]; $name=$Matches[2]
+        $metadata=Get-NcmRawHttpsBytes ('https://api.github.com/repos/Xy2002/ncm-gapless/releases/tags/'+$tag) 1048576 'application/vnd.github+json'
+        $release=[Text.Encoding]::UTF8.GetString($metadata)|ConvertFrom-Json
+        $asset=@($release.assets|Where-Object {$_.name -ceq $name})
+        if ($asset.Count -ne 1 -or $asset[0].id -isnot [ValueType] -or $asset[0].id -lt 1) { throw 'NCM_UPDATE_ASSET_MISSING' }
+        return ,(Get-NcmRawHttpsBytes ('https://api.github.com/repos/Xy2002/ncm-gapless/releases/assets/'+[long]$asset[0].id) $MaximumBytes 'application/octet-stream')
+    }
 }
 function Assert-NcmAdminDirectory {
     param([string]$Path)

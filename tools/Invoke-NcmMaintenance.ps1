@@ -9,7 +9,7 @@ Assert-NcmAdminDirectory $root
 $lock = $null
 try { $lock = [IO.File]::Open((Join-Path $root 'maintenance.lock'),'OpenOrCreate','ReadWrite','None') }
 catch [IO.IOException] { exit 0 }
-$receipt = [ordered]@{ checkedUtc=[DateTime]::UtcNow.ToString('o'); result='idle'; error=$null; version=$null; clientVersion=$null }
+$receipt = [ordered]@{ checkedUtc=[DateTime]::UtcNow.ToString('o'); result='idle'; error=$null; version=$null; clientVersion=$null; updateChecked=$false; downloadedSequence=$null }
 $pending=$false; $rollback=$false; $active=$null; $release=$null; $state=$null
 try {
     $config = Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
@@ -30,10 +30,11 @@ try {
         $state | Add-Member -NotePropertyName failureCount -NotePropertyValue 0 -Force
         $state | Add-Member -NotePropertyName lastFailure -NotePropertyValue '' -Force
     }
-    $updateError = $null
+    $updateError = $(if ($state.PSObject.Properties.Name -contains 'updateLastError') {$state.updateLastError}else{$null})
     if ($CheckNow -or [DateTime]::UtcNow -ge [DateTime]::Parse($state.nextCheckUtc).ToUniversalTime()) {
         try {
             $candidate = Read-NcmSignedRelease (Get-NcmHttpsBytes $script:NcmFeedUrl 131072) $publicKey
+            $receipt.updateChecked=$true
             Assert-NcmReleaseSequence $candidate $state
             if ($state.PSObject.Properties.Name -contains 'rejectedDigest' -and $state.rejectedDigest -ceq $candidate.digest) { throw 'NCM_UPDATE_QUARANTINED' }
             $state.highestSequence = $candidate.document.sequence; $state.highestDigest = $candidate.digest
@@ -42,15 +43,20 @@ try {
             if ($candidate.digest -cne $release.digest) {
                 $package = Get-NcmHttpsBytes $candidate.document.package.url 8388608
                 $null = Read-NcmReleasePayload $package $candidate
+                $receipt.downloadedSequence=$candidate.document.sequence
                 $cache = Join-Path $root ('releases\' + $candidate.digest)
                 Write-NcmAtomicBytes (Join-Path $cache 'package.zip') $package
                 Write-NcmAtomicBytes (Join-Path $cache 'manifest.json') $candidate.envelope
                 Write-NcmMaintenanceJson (Join-Path $root 'pending.json') @{digest=$candidate.digest}
             }
+            $state | Add-Member -NotePropertyName updateLastError -NotePropertyValue $null -Force
+            $updateError=$null
+            Write-NcmMaintenanceJson $statePath $state
         } catch {
             $updateError = 'NCM_UPDATE_CHECK_FAILED'
             if ($_.ToString() -match '(NCM_[A-Z_]+)') { $updateError = $Matches[1] }
             $state.nextCheckUtc = [DateTime]::UtcNow.AddMinutes(30).ToString('o')
+            $state | Add-Member -NotePropertyName updateLastError -NotePropertyValue $updateError -Force
             Write-NcmMaintenanceJson $statePath $state
         }
     }

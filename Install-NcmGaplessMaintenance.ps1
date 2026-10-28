@@ -97,8 +97,16 @@ Write-NcmAtomicBytes (Join-Path $root 'update-public-key.xml') ([Text.Encoding]:
 $cache = Join-Path $root ('releases\' + $release.digest)
 Write-NcmAtomicBytes (Join-Path $cache 'package.zip') $package
 Write-NcmAtomicBytes (Join-Path $cache 'manifest.json') $release.envelope
-Write-NcmMaintenanceJson (Join-Path $root 'active.json') @{digest=$release.digest}
-Write-NcmMaintenanceJson (Join-Path $root 'state.json') @{highestSequence=$release.document.sequence;highestDigest=$release.digest;nextCheckUtc=[DateTime]::UtcNow.ToString('o')}
+if ($existing) {
+    $current=Get-Content -LiteralPath (Join-Path $root 'active.json') -Raw|ConvertFrom-Json
+    if ($current.digest -cne $release.digest) { Write-NcmMaintenanceJson (Join-Path $root 'pending.json') @{digest=$release.digest} }
+    $state.highestSequence=$release.document.sequence; $state.highestDigest=$release.digest
+    $state.nextCheckUtc=[DateTime]::UtcNow.ToString('o')
+    Write-NcmMaintenanceJson (Join-Path $root 'state.json') $state
+} else {
+    Write-NcmMaintenanceJson (Join-Path $root 'active.json') @{digest=$release.digest}
+    Write-NcmMaintenanceJson (Join-Path $root 'state.json') @{highestSequence=$release.document.sequence;highestDigest=$release.digest;nextCheckUtc=[DateTime]::UtcNow.ToString('o')}
+}
 Write-NcmMaintenanceJson (Join-Path $root 'config.json') @{owner='ncm-gapless-maintenance-v1';enabled=$true;clientPath=$client.path}
 $owned = Join-Path (Split-Path $client.path -Parent) 'ncm-gapless\installation.json'
 if ([IO.File]::Exists($owned)) { Write-NcmAtomicBytes (Join-Path $root 'owned.json') ([IO.File]::ReadAllBytes($owned)) }
