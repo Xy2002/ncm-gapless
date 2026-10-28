@@ -14,6 +14,11 @@ function Get-NcmPage {
 
 function Find-NcmPort {
     param([switch]$Launch, [string]$ClientPath)
+    . (Join-Path $PSScriptRoot 'Ncm-StartupState.ps1')
+    $startupPort = Get-NcmStartupPort
+    if ($startupPort) {
+        try { [void](Get-NcmPage -Port $startupPort); return $startupPort } catch { }
+    }
     $processes = @(Get-CimInstance Win32_Process -Filter "Name='cloudmusic.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -and $_.CommandLine -notmatch '--type=' })
     foreach ($process in $processes) {

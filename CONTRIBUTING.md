@@ -10,6 +10,9 @@ Windows 补丁运行需要已适配客户端与 Windows PowerShell；macOS 运�
 python -m pip install -r requirements-dev.txt
 node --test tests/controller.test.cjs tests/aac-timing.test.cjs
 node --test tests/client-adapter.test.js tests/verify-disable.test.js
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-native.test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-attach.test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-install.test.ps1
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
@@ -60,6 +63,8 @@ python tools\build_portable.py
 打包工具按清单收集运行文件与脱敏文档，生成 `artifacts/` 下的 ZIP 和包内 SHA-256 清单。研究脚本、开发依赖和本机记录不进入运行包。
 
 默认生成 Windows 包；`python3 tools/build_portable.py --platform macos` 生成 Mac 包。Mac 包包含启动器必需的两个 Python 模块、通用自动化模板及运行依赖清单，不包含虚拟环境和开发诊断脚本。`.command` 在包内保留执行权限。
+
+Windows 可选启动模块先用 `tools/build_windows_startup.ps1` 构建，再以 `python tools/build_portable.py --windows-startup` 生成包含本项目 DLL 的独立包。本机 System32 绘图 DLL 只在安装时复制，不进入包；编译生成的 DLL 不进入 Git。详细边界见 [Windows 启动模块](docs/windows-startup.md)。
 
 ## 技术记录
 

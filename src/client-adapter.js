@@ -193,5 +193,15 @@
         }
       } };
   }
-  return Object.freeze({ discover: discover });
+  function startupReadiness(target) {
+    const documentState = target.document?.readyState || 'unknown';
+    try {
+      discover(target);
+      return { ready: true, error: null, documentState };
+    } catch (error) {
+      const message = String(error?.message || 'CLIENT_STARTUP_NOT_READY');
+      return { ready: false, error: /^[A-Z_]{1,90}$/.test(message) ? message : 'CLIENT_STARTUP_NOT_READY', documentState };
+    }
+  }
+  return Object.freeze({ discover: discover, startupReadiness: startupReadiness });
 });

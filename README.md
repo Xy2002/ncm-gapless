@@ -70,6 +70,10 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ### Windows
 
+需要从原图标、菜单、程序或其他入口打开时自动启用，可安装可选的 [Windows 启动模块](docs/windows-startup.md)：彻底退出客户端，双击 `Install-NcmGaplessStartup.cmd` 完成一次性安装。它在客户端初始化时加载补丁，加载器完成后退出；不会自动关闭或重开网易云。该入口需要含已编译模块的 Windows startup 包，源码用户需先构建。
+
+只对本次运行启用时：
+
 1. 完全退出网易云，再双击 `Start-NcmGapless.cmd` 启动并启用。
 2. 在网易云中重新选择一首歌曲开始播放。
 3. 双击 `Get-NcmGaplessStatus.cmd` 查看状态。
@@ -105,12 +109,13 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 | `decodedBytes` | 当前与下一首的 PCM 缓冲字节数，不含进程其他内存 |
 | `lastBoundaryDeltaFrames` | 最近一次换曲的计划边界帧差，`0` 表示调度对齐，尚未换曲时为 `null` |
 | `fallbacks` / `lastError` | 回退次数和最近错误 |
-| `automaticEnabled` | Mac 自动启用状态；停止脚本会关闭它 |
+| `automaticEnabled` | 自动启用状态；停止脚本会关闭它 |
+| `automaticLastResult` / `automaticLastError` | Windows 最近一次启动加载结果与错误代码 |
 | `shortcutImported` | Mac 系统快捷指令已导入，还需开启其 App 自动化 |
 
 Windows 双击 `Stop-NcmGapless.cmd`，macOS 双击 `Stop-NcmGapless.command` 停用并恢复官方播放。
 
-补丁只驻留在内存，不修改网易云安装文件。Windows 重启后需重新运行启动器；Mac 完成一次性配置后由系统自动恢复。更新补丁或移动程序目录前，先停用旧版，再从新目录启用并重新选曲。
+音频补丁驻留在内存。可选 Windows 启动模块会新增自己的 DLL 与运行文件，保留网易云原有文件；安装后从原入口打开即可自动加载，停止脚本会撤销自动启用。Mac 完成一次性配置后由系统恢复。Windows 未安装启动模块时，重启后仍需手动运行启动器。更新前先停用旧版，再从新目录安装或启用并重新选曲。
 
 停用会取消下载与预取、关闭 Web Audio 引擎、恢复原始桥接，再交回官方播放器。已接管曲目按当前位置和播放 / 暂停状态恢复；仍在加载的曲目从头恢复。
 

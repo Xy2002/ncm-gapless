@@ -45,6 +45,18 @@
   "version": "0.4.0-experimental",
   "experimentalPatchAvailable": true,
   "requiresLauncherAfterClientRestart": true,
+  "windowsStartupLoader": {
+    "status": "experimental-verified-current-client",
+    "installEntry": "Install-NcmGaplessStartup.cmd",
+    "mode": "cef-browser-initialization-and-short-lived-attach",
+    "requiresOneTimeAdministratorInstall": true,
+    "restartsClient": false,
+    "residentWatcher": false,
+    "manualLauncherRequiredWhenNotInstalledOrDisabled": true,
+    "verifiedEntryPoints": ["desktop-shortcut", "start-menu-shortcut", "direct-executable", "registered-orpheus-protocol"],
+    "notIndependentlyVerified": ["real-system-login", "song-file-associations", "pinned-taskbar-cold-launch"],
+    "evidence": "docs/evidence/windows-startup-v1.json"
+  },
   "verifiedCapabilitiesPlatform": "windows",
   "verifiedCapabilitiesVersion": "0.2.1-experimental",
   "macos": {

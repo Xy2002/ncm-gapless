@@ -9,10 +9,23 @@ import unittest
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from build_portable import build, PLATFORM_FILES, VERSION
+from build_portable import build, PLATFORM_FILES, VERSION, WINDOWS_STARTUP_FILES, ROOT
 
 
 class PortableTests(unittest.TestCase):
+    def test_windows_startup_package_contains_compiled_loader_and_complete_runtime(self):
+        if not (ROOT / "native/windows/MSIMG32.dll").is_file():
+            self.skipTest("Build the Windows native loader before checking its package")
+        with redirect_stdout(StringIO()):
+            output = build("windows", include_windows_startup=True)
+        with zipfile.ZipFile(output) as archive:
+            manifest = json.loads(archive.read("ncm-gapless/manifest.json"))
+            for name in WINDOWS_STARTUP_FILES:
+                self.assertIn(name, manifest["sha256"])
+                self.assertEqual(hashlib.sha256(archive.read("ncm-gapless/" + name)).hexdigest(), manifest["sha256"][name])
+            self.assertNotIn("ncm-gapless/native/windows/startup.cpp", archive.namelist())
+            self.assertNotIn("ncm-gapless/ncm_gapless_msimg32.dll", archive.namelist())
+
     def test_platform_runtime_files_and_checksums(self):
         for platform in ("windows", "macos"):
             with self.subTest(platform=platform), redirect_stdout(StringIO()):

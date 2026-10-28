@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { discover } = require('../src/client-adapter');
+const { discover, startupReadiness } = require('../src/client-adapter');
 
 function fixture(platform) {
   const calls = [];
@@ -42,6 +42,29 @@ function fixture(platform) {
   else target.channel = { call: primary.callAdapter };
   return { target, sdk, primary, legacy, calls, store };
 }
+
+for (const documentState of ['loading', 'interactive', 'complete']) {
+  test('startup waits for playback interfaces instead of page resources: ' + documentState, () => {
+    const { target, calls } = fixture('windows');
+    target.document.readyState = documentState;
+    const original = target.channel.call;
+    assert.deepEqual(startupReadiness(target), { ready: true, error: null, documentState });
+    assert.equal(target.channel.call, original);
+    assert.deepEqual(calls, []);
+  });
+}
+test('startup remains pending without the playback interfaces', () => {
+  const { target } = fixture('windows');
+  target.document.readyState = 'complete';
+  target.document.getElementById = () => null;
+  assert.equal(startupReadiness(target).ready, false);
+});
+test('startup refuses unknown clients before any native call', () => {
+  const { target, calls } = fixture('windows');
+  target.navigator.userAgent = 'Windows NT NeteaseMusicDesktop/9.9.9';
+  assert.equal(startupReadiness(target).error, 'CLIENT_VERSION_UNVERIFIED');
+  assert.deepEqual(calls, []);
+});
 
 for (const platform of ['windows', 'macos']) {
   test(platform + ' intercepts and restores every playback bridge', () => {

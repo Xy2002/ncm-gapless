@@ -8,7 +8,9 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.4.0-experimental"
 FILES = [
-    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "compatibility.json",
+    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "docs/windows-startup.md",
+    "docs/windows-automatic-investigation.md", "LICENSES/CEF.txt", "compatibility.json",
+    "docs/evidence/windows-startup-v1.json",
     "src/client-adapter.js", "src/aac-timing.js", "src/gapless-engine.js", "src/netease-gapless.js", "src/gapless-core.js",
     "docs/implementation.md", "docs/feasibility.md", "docs/evidence/audio-proof.json", "docs/evidence/source-access.json",
     "docs/evidence/audio-proof-v0.2.json", "docs/evidence/integration.json",
@@ -23,16 +25,25 @@ FILES = [
 ]
 PLATFORM_FILES = {
     "windows": ["Start-NcmGapless.cmd", "Start-NcmGapless.ps1", "Stop-NcmGapless.cmd", "Stop-NcmGapless.ps1",
-                "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1"],
+                "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1", "tools/Ncm-StartupState.ps1"],
     "macos": ["Start-NcmGapless.command", "Stop-NcmGapless.command", "Get-NcmGaplessStatus.command",
               "tools/macos_launcher.py", "tools/macos_automation.json", "tools/cdp_probe.py", "requirements-macos.txt"],
 }
+WINDOWS_STARTUP_FILES = [
+    "Install-NcmGaplessStartup.cmd", "Install-NcmGaplessStartup.ps1", "Uninstall-NcmGaplessStartup.cmd",
+    "tools/AutoAttach-NcmGapless.ps1", "tools/Set-NcmStartupInstallation.ps1", "native/windows/MSIMG32.dll",
+]
 
 
-def build(platform):
-    output = ROOT / "artifacts" / f"ncm-gapless-{VERSION.split('-')[0]}-{platform}.zip"
+def build(platform, include_windows_startup=False):
+    if include_windows_startup and platform != "windows":
+        raise ValueError("The Windows startup loader is only available in the Windows package")
+    suffix = platform + ("-startup" if include_windows_startup else "")
+    output = ROOT / "artifacts" / f"ncm-gapless-{VERSION.split('-')[0]}-{suffix}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     files = FILES + PLATFORM_FILES[platform]
+    if include_windows_startup:
+        files += WINDOWS_STARTUP_FILES
     manifest = {"version": VERSION, "platform": platform,
                 "clientVersion": "3.1.12.3444" if platform == "macos" else "3.1.42.205594", "sha256": {}}
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -61,7 +72,9 @@ def build(platform):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", choices=tuple(PLATFORM_FILES), default="windows")
-    build(parser.parse_args().platform)
+    parser.add_argument("--windows-startup", action="store_true", help="Include the locally built optional Windows startup loader")
+    args = parser.parse_args()
+    build(args.platform, include_windows_startup=args.windows_startup)
 
 
 if __name__ == "__main__":
