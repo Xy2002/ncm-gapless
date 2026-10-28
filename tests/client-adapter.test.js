@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { discover } = require('../src/client-adapter');
+const { discover, startupReadiness } = require('../src/client-adapter');
 
 function fixture(platform) {
   const calls = [];
@@ -41,6 +41,59 @@ function fixture(platform) {
   if (platform === 'macos') target.ncmChannelOSX = { postMessage() {} };
   else target.channel = { call: primary.callAdapter };
   return { target, sdk, primary, legacy, calls, store };
+}
+
+for (const documentState of ['loading', 'interactive', 'complete']) {
+  test('startup waits for playback interfaces instead of page resources: ' + documentState, () => {
+    const { target, calls } = fixture('windows');
+    target.document.readyState = documentState;
+    const original = target.channel.call;
+    assert.deepEqual(startupReadiness(target), { ready: true, error: null, documentState });
+    assert.equal(target.channel.call, original);
+    assert.deepEqual(calls, []);
+  });
+}
+test('startup remains pending without the playback interfaces', () => {
+  const { target } = fixture('windows');
+  target.document.readyState = 'complete';
+  target.document.getElementById = () => null;
+  assert.equal(startupReadiness(target).ready, false);
+});
+test('startup refuses an incomplete contract on a new Windows client before any native call', () => {
+  const { target, calls } = fixture('windows');
+  target.navigator.userAgent = 'Windows NT NeteaseMusicDesktop/9.9.9';
+  assert.equal(startupReadiness(target).error, 'CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED');
+  assert.deepEqual(calls, []);
+});
+function futureWindows() {
+  const value = fixture('windows');
+  value.target.navigator.userAgent = 'Windows NT NeteaseMusicDesktop/3.2.0.999999';
+  value.target.AudioContext = function () {};
+  value.target.fetch = async () => {};
+  value.target.AbortController = AbortController;
+  value.sdk.AudioPlayer.play = async () => {};
+  value.store.getState().playingList.curPlayingList = [];
+  return value;
+}
+test('a compatible Windows update qualifies without intercepting playback', () => {
+  const { target, calls } = futureWindows();
+  const original = target.channel.call;
+  assert.equal(discover(target).compatibility, 'detected-playback-contract');
+  assert.equal(startupReadiness(target).ready, true);
+  assert.equal(target.channel.call, original);
+  assert.deepEqual(calls, []);
+});
+for (const missing of ['play', 'events', 'queue', 'audio', 'fetch']) {
+  test('a new Windows client with changed ' + missing + ' fails closed', () => {
+    const { target, sdk, store, calls } = futureWindows();
+    if (missing === 'play') delete sdk.AudioPlayer.play;
+    if (missing === 'events') delete sdk.Bridge.appendRegisterCall;
+    if (missing === 'queue') store.getState().playingList.curPlayingList = null;
+    if (missing === 'audio') delete target.AudioContext;
+    if (missing === 'fetch') delete target.fetch;
+    assert.throws(() => discover(target), /CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED/);
+    assert.deepEqual(calls, []);
+  });
 }
 
 for (const platform of ['windows', 'macos']) {
@@ -90,7 +143,7 @@ test('unknown versions and mismatched platforms fail before interception', () =>
     'Linux NeteaseMusicDesktop/3.1.12.3444', 'Macintosh NeteaseMusicDesktop/9.9.9']) {
     const { target } = fixture('macos');
     target.navigator.userAgent = agent;
-    assert.throws(() => discover(target), /CLIENT_VERSION_UNVERIFIED/);
+    assert.throws(() => discover(target), /CLIENT_VERSION_UNVERIFIED|CLIENT_BRIDGE_MISSING/);
   }
 });
 

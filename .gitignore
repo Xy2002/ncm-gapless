@@ -4,6 +4,7 @@ __pycache__/
 node_modules/
 dist/
 artifacts/
+native/windows/*.dll
 *.log
 *.dmp
 .env

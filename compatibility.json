@@ -42,9 +42,30 @@
     "native-effects-spatial-audio",
     "smtc-and-bluetooth"
   ],
-  "version": "0.4.0-experimental",
+  "version": "0.5.0-experimental",
   "experimentalPatchAvailable": true,
   "requiresLauncherAfterClientRestart": true,
+  "windowsStartupLoader": {
+    "status": "experimental-verified-current-client",
+    "installEntry": "Install-NcmGaplessStartup.cmd",
+    "mode": "cef-browser-initialization-and-short-lived-attach",
+    "requiresOneTimeAdministratorInstall": true,
+    "restartsClient": false,
+    "residentWatcher": false,
+    "manualLauncherRequiredWhenNotInstalledOrDisabled": true,
+    "verifiedEntryPoints": [
+      "desktop-shortcut",
+      "start-menu-shortcut",
+      "direct-executable",
+      "registered-orpheus-protocol"
+    ],
+    "notIndependentlyVerified": [
+      "real-system-login",
+      "song-file-associations",
+      "pinned-taskbar-cold-launch"
+    ],
+    "evidence": "docs/evidence/windows-startup-v1.json"
+  },
   "verifiedCapabilitiesPlatform": "windows",
   "verifiedCapabilitiesVersion": "0.2.1-experimental",
   "macos": {
@@ -100,6 +121,30 @@
       "residentProjectProcessRequired": false,
       "verifiedVersion": "0.4.0-experimental",
       "evidence": "docs/evidence/macos-automation-v0.4.0.json"
+    }
+  },
+  "windowsMaintenance": {
+    "status": "experimental",
+    "installEntry": "Install-NcmGaplessMaintenance.cmd",
+    "mode": "protected-short-lived-system-task",
+    "repairIntervalSeconds": 60,
+    "updateIntervalHours": 6,
+    "clientRestarted": false,
+    "nativeCompatibility": "CEF91 Chromium4472 and shipped platform API hash",
+    "newWindowsVersions": "passive playback-contract detection; not audio qualification",
+    "releaseSignature": "RSA3072 PKCS1 SHA256",
+    "antiRollback": true,
+    "immutableRuntimeDirectories": true,
+    "activationFailureRollback": "three distinct helper failure receipts; no coverage before helper receipt",
+    "repairBoundary": "same approved admin-protected installation path",
+    "updateChannel": "https://github.com/Xy2002/ncm-gapless/releases/tag/windows-maintenance",
+    "documentation": "docs/windows-maintenance.md",
+    "ciPublication": {
+      "status": "verified-real-ci-and-local-install",
+      "triggerTags": "windows-release-v*",
+      "secretConfigured": true,
+      "runUrl": "https://github.com/Xy2002/ncm-gapless/actions/runs/40649332347",
+      "evidence": "docs/evidence/windows-ci-release-v0.5.json"
     }
   }
 }

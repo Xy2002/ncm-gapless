@@ -1,0 +1,7 @@
+LIBRARY MSIMG32
+EXPORTS
+    vSetDdrawflag=ncm_gapless_msimg32.vSetDdrawflag @1
+    AlphaBlend=ncm_gapless_msimg32.AlphaBlend @2
+    DllInitialize=ncm_gapless_msimg32.DllInitialize @3 PRIVATE
+    GradientFill=ncm_gapless_msimg32.GradientFill @4
+    TransparentBlt=ncm_gapless_msimg32.TransparentBlt @5
