@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.5.0-experimental"
+VERSION = "0.6.0-experimental"
 FILES = [
     "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "docs/windows-startup.md",
     "docs/windows-automatic-investigation.md", "LICENSES/CEF.txt", "compatibility.json",
@@ -27,7 +27,9 @@ PLATFORM_FILES = {
     "windows": ["Start-NcmGapless.cmd", "Start-NcmGapless.ps1", "Stop-NcmGapless.cmd", "Stop-NcmGapless.ps1",
                 "Get-NcmGaplessStatus.cmd", "Get-NcmGaplessStatus.ps1", "tools/Ncm-Cdp.ps1", "tools/Get-ClientInfo.ps1", "tools/Ncm-StartupState.ps1", "tools/Ncm-ClientCompatibility.ps1"],
     "macos": ["Start-NcmGapless.command", "Stop-NcmGapless.command", "Get-NcmGaplessStatus.command",
-              "tools/macos_launcher.py", "tools/macos_automation.json", "tools/cdp_probe.py", "requirements-macos.txt"],
+              "tools/macos_launcher.py", "tools/macos_automation.json", "tools/cdp_probe.py", "requirements-macos.txt",
+              "tools/macos_maintenance.py", "tools/macos_updates.py", "tools/macos-update-public-key.pem",
+              "docs/macos-maintenance.md"],
 }
 WINDOWS_STARTUP_FILES = [
     "Install-NcmGaplessStartup.cmd", "Install-NcmGaplessStartup.ps1", "Uninstall-NcmGaplessStartup.cmd",
@@ -43,12 +45,14 @@ WINDOWS_MAINTENANCE_FILES = [
 ]
 
 
-def build(platform, include_windows_startup=False, include_windows_maintenance=False):
+def build(platform, include_windows_startup=False, include_windows_maintenance=False, include_macos_maintenance=False):
     if include_windows_maintenance:
         include_windows_startup = True
     if include_windows_startup and platform != "windows":
         raise ValueError("The Windows startup loader is only available in the Windows package")
-    suffix = platform + ("-maintenance" if include_windows_maintenance else "-startup" if include_windows_startup else "")
+    if include_macos_maintenance and platform != "macos":
+        raise ValueError("The macOS maintenance payload is only available in the macOS package")
+    suffix = platform + ("-maintenance" if include_windows_maintenance or include_macos_maintenance else "-startup" if include_windows_startup else "")
     output = ROOT / "artifacts" / f"ncm-gapless-{VERSION.split('-')[0]}-{suffix}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     files = FILES + PLATFORM_FILES[platform]
@@ -70,9 +74,9 @@ def build(platform, include_windows_startup=False, include_windows_maintenance=F
             entry.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(entry, data)
             manifest["sha256"][name] = hashlib.sha256(data).hexdigest()
-        if include_windows_maintenance:
-            for name in ('windows-update.json', 'windows-payload.zip'):
-                data = (ROOT / 'artifacts/windows-maintenance' / name).read_bytes()
+        if include_windows_maintenance or include_macos_maintenance:
+            for name in (f'{platform}-update.json', f'{platform}-payload.zip'):
+                data = (ROOT / f'artifacts/{platform}-maintenance' / name).read_bytes()
                 archive.writestr('ncm-gapless/updates/' + name, data)
                 manifest['sha256']['updates/' + name] = hashlib.sha256(data).hexdigest()
         archive.writestr("ncm-gapless/manifest.json", json.dumps(manifest, indent=2) + "\n")
@@ -92,8 +96,10 @@ def main():
     parser.add_argument("--platform", choices=tuple(PLATFORM_FILES), default="windows")
     parser.add_argument("--windows-startup", action="store_true", help="Include the locally built optional Windows startup loader")
     parser.add_argument('--windows-maintenance', action='store_true', help='Include the signed Windows maintenance installer and payload')
+    parser.add_argument('--macos-maintenance', action='store_true', help='Include the signed macOS maintenance payload')
     args = parser.parse_args()
-    build(args.platform, include_windows_startup=args.windows_startup, include_windows_maintenance=args.windows_maintenance)
+    build(args.platform, include_windows_startup=args.windows_startup, include_windows_maintenance=args.windows_maintenance,
+          include_macos_maintenance=args.macos_maintenance)
 
 
 if __name__ == "__main__":

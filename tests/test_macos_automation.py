@@ -46,6 +46,14 @@ class AutomationTests(unittest.TestCase):
             self.assertEqual(launcher.on_open(), {"automaticEnabled": False})
             find.assert_not_called()
 
+    def test_stop_between_installer_and_setup_child_prevents_enablement(self):
+        with patch.object(launcher, "REQUEST_TOKEN", "b" * 32), patch.object(launcher, "find_port") as find:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SETUP_CANCELLED"):
+                launcher.enable_automatic(self.app)
+        find.assert_not_called()
+        self.assertIsNone(launcher.automation_settings())
+        self.assertFalse((self.folder / "on-open.command").exists())
+
     def test_closed_client_is_not_opened(self):
         self.enable()
         with patch.object(launcher, "find_port", side_effect=RuntimeError("NCM_NOT_RUNNING")) as find, patch.object(launcher.importlib, "import_module"), patch.object(launcher, "install_patch") as install:
@@ -61,6 +69,31 @@ class AutomationTests(unittest.TestCase):
         last = json.loads((self.folder / "last-run.json").read_text())
         self.assertTrue(last["installed"])
         self.assertIsNone(last["error"])
+        self.assertIsNone(last["instance"])
+
+    def test_cli_returns_its_receipt_even_when_injection_fails(self):
+        settings = self.enable()
+        with patch.object(sys, "argv", ["macos_launcher.py", "on-open"]), patch.object(sys, "platform", "darwin"), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher.importlib, "import_module"), patch.object(launcher, "value", side_effect=["123", {"installed": False}]), patch.object(launcher, "install_patch", side_effect=RuntimeError("NCM_SCRIPT_ERROR_UNSUPPORTED_CLIENT_OR_STATE")), redirect_stdout(StringIO()) as output:
+            with self.assertRaisesRegex(RuntimeError, "NCM_SCRIPT_ERROR_UNSUPPORTED_CLIENT_OR_STATE"):
+                launcher.main()
+        receipt = json.loads(output.getvalue())["_activationReceipt"]
+        self.assertEqual(receipt["token"], settings["token"])
+        self.assertEqual(receipt["instance"], "123")
+        self.assertFalse(receipt["installed"])
+        self.assertEqual(receipt["error"], "NCM_SCRIPT_ERROR_UNSUPPORTED_CLIENT_OR_STATE")
+
+    def test_managed_versions_share_fixed_entry_and_record_distinct_context(self):
+        runtime = self.folder / "versions" / ("1" * 64)
+        with patch.object(launcher, "ROOT", runtime), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher, "value", return_value={"installed": True}), patch.object(launcher, "prepare_shortcut", return_value=True):
+            _, settings = launcher.enable_automatic(self.app)
+            self.assertEqual(settings["root"], str(self.folder))
+            entry = shlex.split((self.folder / "on-open.command").read_text().splitlines()[1])
+            self.assertEqual(entry[-2:], [str(self.folder / "macos_maintenance.py"), "on-open"])
+        with patch.object(launcher, "ROOT", self.folder / "versions" / ("2" * 64)), patch.object(launcher, "find_port", return_value=49321), patch.object(launcher.importlib, "import_module"), patch.object(launcher, "value", side_effect=["12345678.5", {"installed": False}]), patch.object(launcher, "install_patch", return_value={"installed": True}):
+            self.assertTrue(launcher.on_open()["installed"])
+        last = json.loads((self.folder / "last-run.json").read_text())
+        self.assertEqual(last["instance"], "12345678.5")
+        self.assertEqual(last["token"], settings["token"])
 
     def test_unknown_version_fails_closed_and_records_only_code(self):
         self.enable()

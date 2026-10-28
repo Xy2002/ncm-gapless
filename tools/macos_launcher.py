@@ -20,9 +20,9 @@ import uuid
 from cdp_probe import evaluate, get_page
 
 ROOT = Path(__file__).resolve().parents[1]
-CLIENT_VERSION = "3.1.12.3444"
 AUTOMATION_DIR = Path.home() / "Library/Application Support/NcmGapless"
 SHORTCUT_NAME = "NCM Gapless 自动启用"
+REQUEST_TOKEN = None
 
 
 def atomic_write(path, data, *, mode=0o600):
@@ -71,10 +71,27 @@ def operation(*, wait=True):
 
 
 def check_automation(settings):
+    check_setup_request()
     if automation_settings() != settings:
         raise RuntimeError("NCM_AUTO_ENABLE_CANCELLED")
-    if settings["root"] != str(ROOT):
+    if settings["root"] != str(automation_root()):
         raise RuntimeError("NCM_AUTOMATION_SOURCE_CHANGED")
+
+
+def automation_root():
+    # Installed versions share one enablement token across atomic updates.
+    return AUTOMATION_DIR if ROOT.parent == AUTOMATION_DIR / "versions" else ROOT
+
+
+def check_setup_request():
+    if REQUEST_TOKEN is None:
+        return
+    try:
+        request = (AUTOMATION_DIR / "setup-request").read_text()
+    except FileNotFoundError:
+        request = None
+    if request != REQUEST_TOKEN:
+        raise RuntimeError("NCM_SETUP_CANCELLED")
 
 
 def shortcut_installed():
@@ -127,7 +144,7 @@ def ensure_runtime(*, client_path=None):
         return
     except ImportError:
         pass
-    environment = ROOT / ".venv"
+    environment = automation_root() / ".venv"
     python = environment / "bin/python3"
     command = [str(python), str(Path(__file__).resolve()), *sys.argv[1:]]
     if client_path is not None:
@@ -164,14 +181,29 @@ def find_client(client_path=None):
         if info.get("CFBundleExecutable") != "NeteaseMusic":
             raise RuntimeError("NCM_EXECUTABLE_UNVERIFIED")
         version = f'{info.get("CFBundleShortVersionString")}.{info.get("CFBundleVersion")}'
-        if version != CLIENT_VERSION:
+        if not re.fullmatch(r"\d+(\.\d+){2,3}", version):
             raise RuntimeError("CLIENT_VERSION_UNVERIFIED")
         if not (app / "Contents/MacOS/NeteaseMusic").is_file():
             raise RuntimeError("NCM_EXECUTABLE_MISSING")
+        verify_client_signature(app)
         clients[app] = version
     if len(clients) != 1:
         raise RuntimeError("NCM_INSTALLATION_NOT_UNIQUE_USE_CLIENT_PATH")
     return next(iter(clients))
+
+
+def verify_client_signature(app):
+    try:
+        subprocess.run(["/usr/bin/codesign", "--verify", "--strict",
+                        '-R=anchor apple generic and identifier "com.netease.163music"', str(app)],
+                       check=True, capture_output=True, timeout=20)
+        identity = subprocess.run(["/usr/bin/codesign", "-d", "--verbose=2", str(app)],
+                                  check=True, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        raise RuntimeError("NCM_CLIENT_SIGNATURE_INVALID") from None
+    # App Store certificates differ from Developer ID certificates; use the signed team.
+    if "TeamIdentifier=43B53CMF9D" not in identity.stderr.splitlines():
+        raise RuntimeError("NCM_CLIENT_PUBLISHER_UNVERIFIED")
 
 
 def running_commands():
@@ -301,17 +333,26 @@ def value(port, expression, *, user_gesture=False):
 
 
 def install_patch(port, *, check=None):
+    adapter = (ROOT / "src/client-adapter.js").read_text(encoding="utf-8")
+    probe = adapter + "\n;window.NcmGapless?.installed ? ({ready:true}) : window.NcmGaplessClient.startupReadiness(window);"
     deadline = time.monotonic() + 30
+    readiness = {}
     while time.monotonic() < deadline:
         if check:
             check()
         try:
-            if value(port, "Boolean(document.readyState === 'complete' && window.ncmChannelOSX && window.webpackJsonp && document.getElementById('root')?._reactRootContainer)"):
+            readiness = value(port, probe)
+            if not isinstance(readiness, dict):
+                readiness = {}
+            if readiness.get("ready"):
                 break
         except (OSError, ValueError, RuntimeError):
             pass
         time.sleep(.25)
     else:
+        if readiness.get("error") in ("CLIENT_PLAYBACK_CONTRACT_UNSUPPORTED", "CLIENT_VERSION_UNVERIFIED",
+                                      "CLIENT_BRIDGE_MISSING", "WEBPACK_RUNTIME_UNSUPPORTED", "PLAYBACK_INTERFACE_MISSING"):
+            raise RuntimeError(readiness["error"])
         raise RuntimeError("NCM_STARTUP_NOT_READY")
     if check:
         check()
@@ -335,10 +376,12 @@ def uninstall_patch(port):
 
 
 def enable_automatic(app):
-    settings = {"root": str(ROOT), "clientPath": str(app), "token": uuid.uuid4().hex}
+    settings = {"root": str(automation_root()), "clientPath": str(app), "token": uuid.uuid4().hex}
     with operation():
+        check_setup_request()
+        entrypoint = AUTOMATION_DIR / "macos_maintenance.py" if automation_root() == AUTOMATION_DIR else Path(__file__).resolve()
         entry = "#!/bin/sh\nexec " + " ".join(shlex.quote(str(arg)) for arg in (
-            sys.executable, Path(__file__).resolve(), "on-open")) + "\n"
+            sys.executable, entrypoint, "on-open")) + "\n"
         atomic_write(AUTOMATION_DIR / "on-open.command", entry.encode(), mode=0o700)
         atomic_write(AUTOMATION_DIR / "enabled.json", json.dumps(settings).encode())
         check = lambda: check_automation(settings)
@@ -364,13 +407,14 @@ def enable_automatic(app):
             "shortcutImportRequired": not imported}, settings
 
 
-def on_open():
+def on_open(*, receipt=None):
     settings = automation_settings()
     if not settings:
         return {"automaticEnabled": False}
     with operation():
         report = {"installed": False}
         error_code = None
+        instance = None
         try:
             check = lambda: check_automation(settings)
             check()
@@ -379,8 +423,14 @@ def on_open():
             except ImportError:
                 raise RuntimeError("NCM_DEPENDENCY_MISSING") from None
             port = find_port(client_path=settings["clientPath"], restart=True, check=check)
+            instance = value(port, "String(performance.timeOrigin)")
+            if not isinstance(instance, str) or not re.fullmatch(r"\d+(\.\d+)?", instance):
+                instance = None
             report = value(port, "window.NcmGapless?.status?.() || ({installed:false})")
-            if not report.get("installed"):
+            if report.get("installed"):
+                # A duplicate callback may see a patch from the previous runtime.
+                instance = None
+            else:
                 report = install_patch(port, check=check)
             return {"port": port, **report}
         except RuntimeError as error:
@@ -393,10 +443,14 @@ def on_open():
             raise
         finally:
             if automation_settings() == settings:
-                atomic_write(AUTOMATION_DIR / "last-run.json", json.dumps({
+                activation = {
                     "token": settings["token"], "at": int(time.time()),
+                    "instance": instance,
                     "installed": report.get("installed", False), "error": error_code,
-                }).encode())
+                }
+                if receipt is not None:
+                    receipt.update(activation)
+                atomic_write(AUTOMATION_DIR / "last-run.json", json.dumps(activation).encode())
 
 
 def prompt_configuration():
@@ -501,14 +555,26 @@ def setup_automatic(app):
 
 
 def main():
+    global REQUEST_TOKEN
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("setup", "enable", "install", "status", "disable", "on-open"))
     parser.add_argument("--client-path", type=Path, help="Path to NeteaseMusic.app")
+    parser.add_argument("--fallback-client-path", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--request-token", help=argparse.SUPPRESS)
     arguments = parser.parse_args()
+    REQUEST_TOKEN = arguments.request_token
+    if REQUEST_TOKEN is not None and not re.fullmatch(r"[0-9a-f]{32}", REQUEST_TOKEN):
+        raise RuntimeError("NCM_SETUP_CANCELLED")
     if sys.platform != "darwin":
         raise RuntimeError("NCM_MACOS_REQUIRED")
     if arguments.action == "on-open":
-        report = on_open()
+        receipt = {}
+        try:
+            report = on_open(receipt=receipt)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            print(json.dumps({"_activationReceipt": receipt}))
+            raise
+        report = {**report, "_activationReceipt": receipt}
     elif arguments.action in ("enable", "setup"):
         if int((platform.mac_ver()[0] or "0").split(".")[0]) < 27:
             raise RuntimeError("NCM_AUTOMATION_REQUIRES_MACOS_27")
@@ -526,6 +592,7 @@ def main():
             except (OSError, RuntimeError):
                 pass
             finally:
+                (AUTOMATION_DIR / "setup-request").unlink(missing_ok=True)
                 (AUTOMATION_DIR / "enabled.json").unlink(missing_ok=True)
                 (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
         elif arguments.action == "status":
@@ -538,10 +605,13 @@ def main():
                 except (OSError, RuntimeError):
                     pass
                 finally:
+                    (AUTOMATION_DIR / "setup-request").unlink(missing_ok=True)
                     (AUTOMATION_DIR / "enabled.json").unlink(missing_ok=True)
                     (AUTOMATION_DIR / "on-open.command").unlink(missing_ok=True)
             if settings and arguments.client_path is None:
                 arguments.client_path = Path(settings["clientPath"])
+            if arguments.action == "disable" and arguments.client_path is None:
+                arguments.client_path = arguments.fallback_client_path
             try:
                 port = find_port(launch=arguments.action == "install", client_path=arguments.client_path)
             except RuntimeError as error:
