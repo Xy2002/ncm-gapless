@@ -8,7 +8,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.6.0-experimental"
 FILES = [
-    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "docs/windows-startup.md",
+    "LICENSE", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "docs/roadmap.md", "docs/windows-startup.md",
     "docs/windows-automatic-investigation.md", "LICENSES/CEF.txt", "compatibility.json",
     "docs/evidence/windows-startup-v1.json",
     "src/client-adapter.js", "src/aac-timing.js", "src/gapless-engine.js", "src/netease-gapless.js", "src/gapless-core.js",
