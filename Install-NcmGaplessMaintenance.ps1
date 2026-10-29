@@ -1,7 +1,16 @@
 [CmdletBinding()]
-param([string]$ClientPath,[switch]$Uninstall,[switch]$MachineOnly)
+param([string]$ClientPath,[switch]$Uninstall,[switch]$MachineOnly,[switch]$Offline)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$required = @('tools\Ncm-Maintenance.ps1','tools\Ncm-ClientCompatibility.ps1')
+if (-not $Uninstall) {
+    $required += @('tools\Get-ClientInfo.ps1','tools\Ncm-StartupState.ps1','tools\Invoke-NcmMaintenance.ps1',
+        'tools\Set-NcmStartupInstallation.ps1','tools\update-public-key.xml')
+}
+$missing = @($required | Where-Object { -not [IO.File]::Exists((Join-Path $PSScriptRoot $_)) })
+if ($missing.Count) {
+    throw "NCM_MAINTENANCE_INSTALLER_FILES_MISSING: Missing $($missing -join ', '). Download ncm-gapless-*-windows-maintenance.zip from https://github.com/Xy2002/ncm-gapless/releases, fully extract it, then run Install-NcmGaplessMaintenance.cmd. Automatic download requires the complete installer scripts and pinned public key."
+}
 . (Join-Path $PSScriptRoot 'tools\Ncm-Maintenance.ps1')
 . (Join-Path $PSScriptRoot 'tools\Ncm-ClientCompatibility.ps1')
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -10,8 +19,9 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -MachineOnly' -f $PSCommandPath
     if ($ClientPath) { $arguments += ' -ClientPath "{0}"' -f $ClientPath }
     if ($Uninstall) { $arguments += ' -Uninstall' }
+    if ($Offline) { $arguments += ' -Offline' }
     $child = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe') -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -Wait -PassThru
-    if ($child.ExitCode) { throw 'NCM_MAINTENANCE_INSTALL_FAILED' }
+    if ($child.ExitCode) { throw 'NCM_MAINTENANCE_INSTALL_FAILED: Run Install-NcmGaplessMaintenance.ps1 in an administrator PowerShell to see the detailed error. If windows-update.json or windows-payload.zip is missing and automatic download fails, download ncm-gapless-*-windows-maintenance.zip from https://github.com/Xy2002/ncm-gapless/releases, fully extract it, then run Install-NcmGaplessMaintenance.cmd.' }
     # Enablement always belongs to the caller, never an alternate elevation account.
     if (-not $Uninstall) {
         . (Join-Path $PSScriptRoot 'tools\Ncm-StartupState.ps1')
@@ -60,11 +70,9 @@ if (-not $ClientPath) {
 $client = Assert-NcmOfficialClient $ClientPath
 Assert-NcmAdminDirectory (Split-Path $client.path -Parent)
 $publicKey = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'tools\update-public-key.xml'))
-$packageDirectory = Join-Path $PSScriptRoot 'artifacts\windows-maintenance'
-if ([IO.Directory]::Exists((Join-Path $PSScriptRoot 'updates'))) { $packageDirectory=Join-Path $PSScriptRoot 'updates' }
-$release = Read-NcmSignedRelease ([IO.File]::ReadAllBytes((Join-Path $packageDirectory 'windows-update.json'))) $publicKey
-$package = [IO.File]::ReadAllBytes((Join-Path $packageDirectory 'windows-payload.zip'))
-$null = Read-NcmReleasePayload $package $release
+$installation = Get-NcmMaintenanceInstallRelease $PSScriptRoot $publicKey -Offline:$Offline
+$release = $installation.release
+$package = $installation.package
 if ($existing) {
     $oldKey = [IO.File]::ReadAllText((Join-Path $root 'update-public-key.xml'))
     if ($oldKey -cne $publicKey) { throw 'NCM_UPDATE_KEY_CHANGE_REJECTED' }

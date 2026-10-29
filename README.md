@@ -2,7 +2,7 @@
 
 为 Windows 和 macOS 的网易云音乐桌面客户端提供实验性无缝播放。提前准备下一首，在同一个音频时钟上接续播放，保留曲目本身的静音，不使用交叉淡化。
 
-[中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
+[中文介绍与安装指南](https://xy2002.github.io/ncm-gapless/) · [下载 Windows 维护安装包](https://github.com/Xy2002/ncm-gapless/releases/download/windows-release-v0.5.0-ci-1793171964/ncm-gapless-0.5.0-windows-maintenance.zip) · [下载源码 ZIP](https://github.com/Xy2002/ncm-gapless/archive/refs/heads/main.zip)
 
 当前开发版本：`0.6.0-experimental`。Mac 自动更新通道尚未发布。
 
@@ -66,11 +66,18 @@ MP3、FLAC、WAV 由客户端的 `decodeAudioData` 解码。AAC/M4A 还需要核
 
 ## 开始使用
 
-下载仓库源码 ZIP 或克隆仓库。使用便携包时也需完整解压并保留目录结构。
+Windows 自动维护可直接使用下面的维护安装包；开发或使用其他入口时可下载源码 ZIP 或克隆仓库。所有 ZIP 均需完整解压并保留目录结构。
 
 ### Windows
 
-希望网易云更新后自动检查兼容、恢复加载模块和获取补丁更新，可完整解压 Windows maintenance 包并运行 `Install-NcmGaplessMaintenance.cmd`。一次管理员安装后，系统任务定时短暂运行；运行中的客户端延后处理，不会自动关闭或重开。更新包必须通过内置公钥验签，离线可从缓存修复。详见 [自动维护说明](docs/windows-maintenance.md)。
+希望网易云更新后自动检查兼容、恢复加载模块和获取补丁更新：
+
+1. 下载 [Windows 维护安装包（0.5.0 实验版）](https://github.com/Xy2002/ncm-gapless/releases/download/windows-release-v0.5.0-ci-1793171964/ncm-gapless-0.5.0-windows-maintenance.zip)，或在 [Releases](https://github.com/Xy2002/ncm-gapless/releases) 的 Assets 中选择 `ncm-gapless-*-windows-maintenance.zip`。`Source code (zip)` 是源码包，不含已构建的维护载荷。
+2. 完整解压，双击 `Install-NcmGaplessMaintenance.cmd`，允许一次管理员安装。完整维护包自带 `updates/windows-update.json` 和 `updates/windows-payload.zip`，首次安装也可离线进行。
+
+使用当前源码 ZIP、克隆仓库或 Windows startup 包时，也可直接运行同一个安装器：如果缺少完整的本地签名清单和载荷，会自动从固定 Windows 维护通道下载，使用内置公钥验签并核对哈希后再安装，无需自己编译。下载的是通道已发布的 Windows 版本，可能与上方开发版本不同；下载失败会显示手动下载入口。需要禁止联网时，运行 `.\Install-NcmGaplessMaintenance.ps1 -Offline`；缺文件时会明确列出缺失路径与解决方法。
+
+安装后系统任务定时短暂运行；运行中的客户端延后处理，不会自动关闭或重开。离线可从已验签缓存修复。详见 [自动维护说明](docs/windows-maintenance.md)。
 
 需要从原图标、菜单、程序或其他入口打开时自动启用，可安装可选的 [Windows 启动模块](docs/windows-startup.md)：彻底退出客户端，双击 `Install-NcmGaplessStartup.cmd` 完成一次性安装。它在客户端初始化时加载补丁，加载器完成后退出；不会自动关闭或重开网易云。该入口需要含已编译模块的 Windows startup 包，源码用户需先构建。
 

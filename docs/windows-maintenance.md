@@ -1,6 +1,24 @@
 # Windows 自动维护
 
-完整解压 Windows maintenance 包，运行 `Install-NcmGaplessMaintenance.cmd`，允许一次管理员安装。维护任务和公钥保存在管理员保护的 `Program Files/NCMGaplessMaintenance`；当前账号的自动启用开关仍单独保存。安装后可移走下载目录。
+下载 [Windows 维护安装包（0.5.0 实验版）](https://github.com/Xy2002/ncm-gapless/releases/download/windows-release-v0.5.0-ci-1793171964/ncm-gapless-0.5.0-windows-maintenance.zip)，或在 [Releases](https://github.com/Xy2002/ncm-gapless/releases) 的 Assets 中选择 `ncm-gapless-*-windows-maintenance.zip`。完整解压后运行 `Install-NcmGaplessMaintenance.cmd`，允许一次管理员安装。维护任务和公钥保存在管理员保护的 `Program Files/NCMGaplessMaintenance`；当前账号的自动启用开关仍单独保存。安装后可移走下载目录。
+
+## 首次安装的自动下载与离线方式
+
+当前源码目录和 Windows startup 包也可直接运行 `Install-NcmGaplessMaintenance.cmd`。安装器优先使用 `updates/` 中完整的 `windows-update.json` 与 `windows-payload.zip`，其次检查本地构建目录 `artifacts/windows-maintenance/`。同一目录内必须同时存在两个文件；残缺的文件不会与另一目录或网络文件混用。
+
+两个目录都没有完整文件时，安装器自动从固定 Windows 维护通道获取清单，先用内置公钥验签，再从签名指定的本仓库发布地址下载载荷，验证长度、SHA-256 和固定文件名单后才继续安装。下载只在内存中验证，成功安装后进入管理员保护的缓存；源码目录和残缺文件不会被改写。此流程下载的是已发布的 Windows 通道版本，不会把未发布的源码开发版自动编译或发布。
+
+禁止首次安装联网时使用：
+
+```powershell
+.\Install-NcmGaplessMaintenance.ps1 -Offline
+# 或通过 CMD 入口传入同一参数：
+.\Install-NcmGaplessMaintenance.cmd -Offline
+```
+
+`-Offline` 只约束这次安装取包；安装后的维护任务仍按下文周期检查更新。完整维护包自带 `updates/`，不加参数也无需首次下载。缺文件且指定 `-Offline` 时显示 `NCM_MAINTENANCE_PACKAGE_MISSING`、缺失路径和手动下载入口；网络失败显示 `NCM_MAINTENANCE_DOWNLOAD_FAILED`，可恢复网络重试或改用完整维护包。脚本或内置公钥被删时显示 `NCM_MAINTENANCE_INSTALLER_FILES_MISSING`，需重新完整解压安装器。
+
+本地完整包签名错误或载荷损坏时直接拒绝，不自动换包掩盖错误。下载清单未通过验签时不会请求载荷。安装器不会下载并执行另一个安装脚本。若提权后的安装失败，提示中会给出手动下载入口，并说明如何在管理员 PowerShell 中查看详细错误。
 
 维护任务由 Windows 在开机、登录及每分钟短暂执行，没有常驻监听程序。每轮检查当前安装；每 6 小时检查一次固定 GitHub 更新通道，网络失败后 30 分钟重试。离线时使用已验签缓存修复。任务不关闭、重开或启动网易云；运行中的客户端会延后处理。更新后若立即启动且加载模块已被删除，本次可能尚未加载，正常退出后一分钟内会修复，下次打开生效。
 
@@ -38,6 +56,7 @@
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-maintenance.test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-maintenance-install.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-native.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-attach.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-install.test.ps1
