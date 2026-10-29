@@ -34,7 +34,9 @@ PLATFORM_FILES = {
 WINDOWS_STARTUP_FILES = [
     "Install-NcmGaplessStartup.cmd", "Install-NcmGaplessStartup.ps1", "Uninstall-NcmGaplessStartup.cmd",
     "tools/AutoAttach-NcmGapless.ps1", "tools/Set-NcmStartupInstallation.ps1", "native/windows/MSIMG32.dll",
-    'Install-NcmGaplessMaintenance.ps1', 'tools/Ncm-Maintenance.ps1',
+    'Install-NcmGaplessMaintenance.cmd', 'Install-NcmGaplessMaintenance.ps1', 'Uninstall-NcmGaplessMaintenance.cmd',
+    'tools/Ncm-Maintenance.ps1', 'tools/Invoke-NcmMaintenance.ps1', 'tools/update-public-key.xml',
+    'docs/windows-maintenance.md',
 ]
 WINDOWS_MAINTENANCE_FILES = [
     'Install-NcmGaplessMaintenance.cmd', 'Install-NcmGaplessMaintenance.ps1', 'Uninstall-NcmGaplessMaintenance.cmd',

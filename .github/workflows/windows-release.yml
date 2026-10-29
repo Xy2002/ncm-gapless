@@ -25,6 +25,7 @@ jobs:
           & tests/windows-maintenance.test.ps1
           & tests/windows-permissions.test.ps1
           & tests/windows-download.test.ps1
+          & tests/windows-maintenance-install.test.ps1
           node --test tests/client-adapter.test.js tests/controller.test.cjs tests/aac-timing.test.cjs tests/verify-disable.test.js
           if ($LASTEXITCODE) { throw 'JavaScript regressions failed' }
       - name: Sign fixed payload

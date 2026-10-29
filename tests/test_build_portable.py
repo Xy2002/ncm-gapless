@@ -47,6 +47,15 @@ class PortableTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(archive.read("ncm-gapless/" + name)).hexdigest(), manifest["sha256"][name])
             self.assertNotIn("ncm-gapless/native/windows/startup.cpp", archive.namelist())
             self.assertNotIn("ncm-gapless/ncm_gapless_msimg32.dll", archive.namelist())
+            # The startup package can bootstrap maintenance without an embedded signed payload.
+            for name in ("Install-NcmGaplessMaintenance.cmd", "Install-NcmGaplessMaintenance.ps1",
+                         "tools/Ncm-Maintenance.ps1", "tools/Ncm-ClientCompatibility.ps1",
+                         "tools/Get-ClientInfo.ps1", "tools/Ncm-StartupState.ps1",
+                         "tools/Invoke-NcmMaintenance.ps1", "tools/Set-NcmStartupInstallation.ps1",
+                         "tools/update-public-key.xml"):
+                self.assertIn("ncm-gapless/" + name, archive.namelist())
+            self.assertNotIn("ncm-gapless/updates/windows-update.json", archive.namelist())
+            self.assertNotIn("ncm-gapless/updates/windows-payload.zip", archive.namelist())
 
     def test_platform_runtime_files_and_checksums(self):
         for platform in ("windows", "macos"):

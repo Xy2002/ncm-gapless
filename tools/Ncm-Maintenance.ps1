@@ -115,6 +115,39 @@ function Get-NcmHttpsBytes {
         return ,(Get-NcmRawHttpsBytes ('https://api.github.com/repos/Xy2002/ncm-gapless/releases/assets/'+[long]$asset[0].id) $MaximumBytes 'application/octet-stream')
     }
 }
+function Get-NcmMaintenanceInstallRelease {
+    param([string]$SourceRoot,[string]$PublicKey,[switch]$Offline)
+    $help = 'Download ncm-gapless-*-windows-maintenance.zip from https://github.com/Xy2002/ncm-gapless/releases, fully extract it, then run Install-NcmGaplessMaintenance.cmd. The source ZIP does not include the built maintenance files.'
+    $missing = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($relative in @('updates','artifacts\windows-maintenance')) {
+        $directory = Join-Path $SourceRoot $relative
+        $manifestPath = Join-Path $directory 'windows-update.json'
+        $packagePath = Join-Path $directory 'windows-payload.zip'
+        if ([IO.File]::Exists($manifestPath) -and [IO.File]::Exists($packagePath)) {
+            try {
+                $envelope = [IO.File]::ReadAllBytes($manifestPath)
+                $package = [IO.File]::ReadAllBytes($packagePath)
+            } catch { throw "NCM_MAINTENANCE_PACKAGE_READ_FAILED: Cannot read windows-update.json and windows-payload.zip in '$directory'. $help Details: $_" }
+            $release = Read-NcmSignedRelease $envelope $PublicKey
+            $null = Read-NcmReleasePayload $package $release
+            return [PSCustomObject]@{release=$release;package=$package}
+        }
+        foreach ($path in @($manifestPath,$packagePath)) {
+            if (-not [IO.File]::Exists($path)) { $missing.Add($path) }
+        }
+    }
+    if ($Offline) { throw "NCM_MAINTENANCE_PACKAGE_MISSING: No complete local pair of windows-update.json and windows-payload.zip was found. Missing: $($missing -join ', '). $help Alternatively, rerun without -Offline to download the signed release automatically." }
+    Write-Host 'Local maintenance files (windows-update.json and windows-payload.zip) are missing or incomplete. Downloading the signed Windows maintenance release...'
+    try { $envelope = Get-NcmHttpsBytes $script:NcmFeedUrl 131072 }
+    catch { throw "NCM_MAINTENANCE_DOWNLOAD_FAILED: Cannot download windows-update.json; windows-payload.zip is also required. $help Check your network and retry. Details: $_" }
+    # Only the signed manifest may supply the payload URL. Never download or run an installer script.
+    $release = Read-NcmSignedRelease $envelope $PublicKey
+    try { $package = Get-NcmHttpsBytes $release.document.package.url $release.document.package.bytes }
+    catch { throw "NCM_MAINTENANCE_DOWNLOAD_FAILED: Cannot download windows-payload.zip for windows-update.json. $help Check your network and retry. Details: $_" }
+    $null = Read-NcmReleasePayload $package $release
+    Write-Host "Downloaded and verified Windows maintenance release $($release.document.version)."
+    return [PSCustomObject]@{release=$release;package=$package}
+}
 function Assert-NcmAdminDirectory {
     param([string]$Path)
     $item = Get-Item -LiteralPath $Path
