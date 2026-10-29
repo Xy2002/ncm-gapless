@@ -83,7 +83,8 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(app["description"], self.page.find("meta", name="description")[0]["attrs"]["content"])
         self.assertEqual(app["softwareVersion"], self.compatibility["version"])
         self.assertEqual(set(app["operatingSystem"]), {"Windows x64", "macOS Apple Silicon"})
-        self.assertTrue({"offers", "aggregateRating", "review", "license"}.isdisjoint(app))
+        self.assertEqual(app["license"], "https://github.com/Xy2002/ncm-gapless/blob/main/LICENSE")
+        self.assertTrue({"offers", "aggregateRating", "review"}.isdisjoint(app))
 
     def test_local_resources_and_anchor_links_resolve(self):
         ids = {element["attrs"]["id"] for element in self.page.elements if "id" in element["attrs"]}
