@@ -1,4 +1,4 @@
-# Shared signed-release validation. This file is installed in an admin-only directory.
+﻿# Shared signed-release validation. This file is installed in an admin-only directory.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:NcmReleaseFiles = @('MSIMG32.dll','ncm-gapless/tools/AutoAttach-NcmGapless.ps1',
@@ -147,6 +147,49 @@ function Get-NcmMaintenanceInstallRelease {
     $null = Read-NcmReleasePayload $package $release
     Write-Host "Downloaded and verified Windows maintenance release $($release.document.version)."
     return [PSCustomObject]@{release=$release;package=$package}
+}
+function Wait-NcmMaintenanceClientExit {
+    param([string]$ClientPath,[ValidateRange(1,900)][int]$TimeoutSeconds=300)
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    $announced=$false
+    while (@(Get-CimInstance Win32_Process -Filter "Name='cloudmusic.exe'" -ErrorAction Stop |
+        Where-Object { -not $_.ExecutablePath -or $_.ExecutablePath -ieq $ClientPath }).Count) {
+        if (-not $announced) {
+            Write-Host '请从托盘菜单彻底退出网易云。安装器正在等待进程结束，退出后会自动继续；按 Ctrl+C 可取消。'
+            $announced=$true
+        }
+        if ($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds) { throw 'NCM_MAINTENANCE_CLIENT_EXIT_TIMEOUT: 网易云仍在运行，尚未开始安装。请彻底退出后重新运行安装器。' }
+        Start-Sleep -Milliseconds 500
+    }
+}
+function Wait-NcmMaintenanceSetup {
+    param([string]$Root,[string]$InstallationId,[ValidateRange(1,900)][int]$TimeoutSeconds=300)
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    $announced=$false
+    Write-Host '正在确认首次安装/修复结果，请暂时保持网易云关闭。'
+    do {
+        $config=Read-NcmSmallJson (Join-Path $Root 'config.json')
+        if ($config) {
+            if ($config.owner -cne 'ncm-gapless-maintenance-v1') { throw 'NCM_MAINTENANCE_CONFIG_INVALID' }
+            if ($config.PSObject.Properties.Name -notcontains 'installationId' -or $config.installationId -cne $InstallationId) { throw 'NCM_MAINTENANCE_INSTALLATION_CHANGED: 安装配置已被另一次操作替换，请重新运行安装器。' }
+            if ($config.PSObject.Properties.Name -contains 'enabled' -and -not $config.enabled) { throw 'NCM_MAINTENANCE_SETUP_CANCELLED: 自动维护已停用，安装确认已取消。' }
+        }
+        $receipt=Read-NcmSmallJson (Join-Path $Root 'setup-result.json')
+        if ($config -and $receipt -and $receipt.PSObject.Properties.Name -contains 'installationId' -and $receipt.installationId -ceq $InstallationId) {
+            if ($receipt.result -in @('healthy','repaired','updated','rolled-back')) {
+                if ($receipt.error) { Write-Warning "启动文件已就绪，但本轮维护检查报告 $($receipt.error)。可运行 Get-NcmGaplessStatus.cmd 查看详情。" }
+                return $receipt
+            }
+            if ($receipt.result -eq 'failed') { throw "NCM_MAINTENANCE_INITIAL_REPAIR_FAILED: 首次修复失败：$($receipt.error)。请保持网易云关闭，运行 Get-NcmGaplessStatus.cmd 查看详情后重试。" }
+            if ($receipt.result -eq 'disabled') { throw 'NCM_MAINTENANCE_SETUP_CANCELLED: 自动维护已停用。' }
+            if ($receipt.result -eq 'deferred-client-running' -and -not $announced) {
+                Write-Host '检测到网易云在安装期间重新运行。请彻底退出并保持关闭，维护任务会继续修复。'
+                $announced=$true
+            }
+        }
+        if ($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds) { throw 'NCM_MAINTENANCE_SETUP_PENDING: 维护任务已注册，首次修复尚未确认完成。请保持网易云关闭后重试安装器，或运行 Get-NcmGaplessStatus.cmd 查看结果；任务仍会按分钟继续检查。' }
+        Start-Sleep -Milliseconds 500
+    } while ($true)
 }
 function Assert-NcmAdminDirectory {
     param([string]$Path)

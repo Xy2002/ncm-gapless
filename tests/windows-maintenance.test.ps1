@@ -69,7 +69,8 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
 '@
     [IO.File]::WriteAllText((Join-Path $root 'Ncm-ClientCompatibility.ps1'),$mocks)
     Write-NcmAtomicBytes (Join-Path $root 'update-public-key.xml') ([Text.Encoding]::UTF8.GetBytes($rsa.ToXmlString($false)))
-    Write-NcmMaintenanceJson (Join-Path $root 'config.json') @{owner='ncm-gapless-maintenance-v1';clientPath=$client}
+    $installationId='1234567890abcdef1234567890abcdef'
+    Write-NcmMaintenanceJson (Join-Path $root 'config.json') @{owner='ncm-gapless-maintenance-v1';clientPath=$client;installationId=$installationId}
     Write-NcmMaintenanceJson (Join-Path $root 'state.json') @{highestSequence=100;highestDigest=$first.release.digest;nextCheckUtc='2000-01-01T00:00:00Z'}
     Write-NcmMaintenanceJson (Join-Path $root 'active.json') @{digest=$first.release.digest}
     $cache=Join-Path $root ('releases\'+$first.release.digest)
@@ -89,10 +90,16 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     $status=Run-Worker
     if ($status.result -cne 'repaired') { throw ($status|ConvertTo-Json) }
     Write-Host 'PASS worker installs only signed cached runtime, preserving fixture client'
+    $setup=Get-Content -LiteralPath (Join-Path $root 'setup-result.json') -Raw|ConvertFrom-Json
+    if ($setup.installationId -cne $installationId -or $setup.result -cne 'repaired' -or $setup.checkedUtc -cne $status.checkedUtc -or $status.PSObject.Properties.Name -contains 'installationId') { throw 'INITIAL_REPAIR_RECEIPT_NOT_BOUND_TO_INSTALLATION' }
+    Write-Host 'PASS initial repair receipt is fresh and bound to the installation without changing public status'
     $env:NCM_FIXTURE_RUNNING='1'
     [IO.File]::Delete((Join-Path $clientRoot 'MSIMG32.dll'))
     $status=Run-Worker
     if ($status.result -cne 'deferred-client-running' -or [IO.File]::Exists((Join-Path $clientRoot 'MSIMG32.dll'))) { throw 'DID_NOT_DEFER' }
+    $setup=Get-Content -LiteralPath (Join-Path $root 'setup-result.json') -Raw|ConvertFrom-Json
+    if ($setup.installationId -cne $installationId -or $setup.result -cne 'deferred-client-running') { throw 'DEFERRED_SETUP_RECEIPT_MISSING' }
+    Write-Host 'PASS setup receipt reports a deferred repair instead of an earlier success'
     $env:NCM_FIXTURE_RUNNING='0'; $env:NCM_FIXTURE_OFFLINE='1'
     [IO.File]::Delete((Join-Path $clientRoot 'ncm-gapless\installation.json'))
     $status=Run-Worker
@@ -154,6 +161,9 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     [IO.File]::WriteAllText((Join-Path $clientRoot 'MSIMG32.dll'),'foreign')
     $status=Run-Worker
     if ($status.result -cne 'failed' -or [IO.File]::ReadAllText((Join-Path $clientRoot 'MSIMG32.dll')) -cne 'foreign') { throw 'FOREIGN_FILE_OVERWRITTEN' }
+    $setup=Get-Content -LiteralPath (Join-Path $root 'setup-result.json') -Raw|ConvertFrom-Json
+    if ($setup.installationId -cne $installationId -or $setup.result -cne 'failed' -or $setup.error -cne $status.error) { throw 'FAILED_SETUP_RECEIPT_MISSING' }
+    Write-Host 'PASS setup receipt exposes the actual failed repair'
     Write-Host 'PASS conflicting loader is preserved'
     if ([IO.File]::ReadAllText($client) -cne 'fixture, never executed') { throw 'CLIENT_CHANGED' }
     $config=Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw|ConvertFrom-Json
@@ -169,7 +179,12 @@ function Get-NcmActivationHealth($ClientPath,$Digest) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Set-NcmStartupInstallation.ps1') -ClientPath $client -Payload $stage -ResultPath (Join-Path $stage 'result.json') -Repair -RuntimeDigest $first.release.digest
     if ($LASTEXITCODE) { throw 'VERSIONED_REINSTALL_FAILED' }
     Write-Host 'PASS versioned physical uninstall and reinstall preserve old caches without blocking installation'
-    Write-Host '18 maintenance security and worker checks passed; no real client, scheduled task or network used.'
+    $config.PSObject.Properties.Remove('installationId')
+    Write-NcmMaintenanceJson (Join-Path $root 'config.json') $config
+    $status=Run-Worker
+    if ($status.result -cne 'disabled') { throw 'LEGACY_CONFIG_REJECTED' }
+    Write-Host 'PASS maintenance configurations without an installation ID remain compatible'
+    Write-Host '22 maintenance security and worker checks passed; no real client, scheduled task or network used.'
 } finally {
     $rsa.Dispose()
     foreach ($name in @('NCM_FIXTURE_RUNNING','NCM_FIXTURE_OFFLINE','NCM_FIXTURE_FEED','NCM_FIXTURE_CLIENT','NCM_FIXTURE_FAILURE','NCM_FIXTURE_LAUNCH_RACE','NCM_FIXTURE_RAPID')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
