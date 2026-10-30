@@ -11,9 +11,11 @@ try { $lock = [IO.File]::Open((Join-Path $root 'maintenance.lock'),'OpenOrCreate
 catch [IO.IOException] { exit 0 }
 $receipt = [ordered]@{ checkedUtc=[DateTime]::UtcNow.ToString('o'); result='idle'; error=$null; version=$null; clientVersion=$null; updateChecked=$false; downloadedSequence=$null }
 $pending=$false; $rollback=$false; $active=$null; $release=$null; $state=$null
+$installationId=$null
 try {
-    $config = Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
+    $config = Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($config.owner -cne 'ncm-gapless-maintenance-v1') { throw 'NCM_MAINTENANCE_CONFIG_INVALID' }
+    if ($config.PSObject.Properties.Name -contains 'installationId' -and $config.installationId -cmatch '^[0-9a-f]{32}$') { $installationId=$config.installationId }
     if ($config.PSObject.Properties.Name -contains 'enabled' -and -not $config.enabled) { $receipt.result='disabled'; return }
     $clientDirectory = Split-Path $config.clientPath -Parent
     Assert-NcmAdminDirectory $clientDirectory
@@ -176,5 +178,12 @@ try {
     # Keep the signed pending payload for the next closed-client retry.
     if ($receipt.error -ceq 'NCM_EXIT_CLIENT_BEFORE_STARTUP_INSTALL') { $receipt.result='deferred-client-running' }
 } finally {
-    try { Write-NcmMaintenanceJson (Join-Path $root 'status.json') $receipt } finally { $lock.Dispose() }
+    try {
+        Write-NcmMaintenanceJson (Join-Path $root 'status.json') $receipt
+        if ($installationId) {
+            # A separate receipt binds the caller's wait to this installation, not old status.
+            $setupReceipt=[ordered]@{installationId=$installationId;checkedUtc=$receipt.checkedUtc;result=$receipt.result;error=$receipt.error;version=$receipt.version}
+            Write-NcmMaintenanceJson (Join-Path $root 'setup-result.json') $setupReceipt
+        }
+    } finally { $lock.Dispose() }
 }

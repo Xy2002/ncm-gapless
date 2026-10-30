@@ -4,6 +4,16 @@
 
 ## 首次安装的自动下载与离线方式
 
+当前源码中的新版安装器会保留命令窗口，按三步显示进度：
+
+1. 检查客户端进程，提示从托盘菜单彻底退出网易云，并自动等待退出。可以按 Ctrl+C 取消。
+2. 安装维护组件并立即启动维护任务，等待本次首次安装/修复的结果。请保持网易云关闭；如果期间又启动客户端，会提示再次退出。
+3. 只有收到本次操作对应的成功修复结果，才提示“现在可以正常打开网易云”。打开后重新选曲开始播放。
+
+每个等待阶段默认最多 300 秒，可通过 `-WaitTimeoutSeconds 600` 调整（范围 1–900 秒）。等待退出超时不会开始安装；注册任务后等待超时会明确显示“首次修复尚未确认”，任务继续定时运行，可在退出客户端后重跑安装器或运行状态命令查看。修复失败会显示实际错误；旧成功记录、另一轮安装的结果或已撤销的维护配置都不会触发完成提示。更新检查失败但本地文件已验证可用时，会保留警告并允许使用缓存版本。
+
+以上三步流程适用于当前源码及后续发布包。已发布 `0.5.0` 安装包使用旧流程，首次安装后需手动彻底退出客户端并等待约 90 秒，再重新打开。日常普通启动不需要每次等待一分钟。
+
 当前源码目录和 Windows startup 包也可直接运行 `Install-NcmGaplessMaintenance.cmd`。安装器优先使用 `updates/` 中完整的 `windows-update.json` 与 `windows-payload.zip`，其次检查本地构建目录 `artifacts/windows-maintenance/`。同一目录内必须同时存在两个文件；残缺的文件不会与另一目录或网络文件混用。
 
 两个目录都没有完整文件时，安装器自动从固定 Windows 维护通道获取清单，先用内置公钥验签，再从签名指定的本仓库发布地址下载载荷，验证长度、SHA-256 和固定文件名单后才继续安装。下载只在内存中验证，成功安装后进入管理员保护的缓存；源码目录和残缺文件不会被改写。此流程下载的是已发布的 Windows 通道版本，不会把未发布的源码开发版自动编译或发布。
@@ -57,6 +67,7 @@
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-maintenance.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-maintenance-install.test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-maintenance-setup.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-native.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-attach.test.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/windows-startup-install.test.ps1
